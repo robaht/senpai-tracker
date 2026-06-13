@@ -106,12 +106,25 @@ export const SEARCH_QUERY = gql`
   }
 `;
 
-/** Single anime detail. */
+/**
+ * Single anime detail. Adds `relations` on top of the shared fragment — each
+ * related node reuses MediaFields (so it's a full Media and PosterCard works on
+ * it directly), but nodes intentionally omit their own `relations` to keep the
+ * payload bounded (relations are a graph; one hop is enough for the detail rail).
+ */
 export const MEDIA_BY_ID_QUERY = gql`
   ${MEDIA_FIELDS}
   query MediaById($id: Int!) {
     Media(id: $id, type: ANIME) {
       ...MediaFields
+      relations {
+        edges {
+          relationType
+          node {
+            ...MediaFields
+          }
+        }
+      }
     }
   }
 `;

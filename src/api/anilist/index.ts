@@ -6,7 +6,14 @@ import {
   SEASONAL_QUERY,
   TRENDING_QUERY,
 } from './queries';
-import type { AiringScheduleItem, Media, MediaSeason, Page, PageInfo } from './types';
+import type {
+  AiringScheduleItem,
+  Media,
+  MediaRelationEdge,
+  MediaSeason,
+  Page,
+  PageInfo,
+} from './types';
 
 export * from './types';
 
@@ -50,9 +57,15 @@ export async function searchAnime(search: string, page = 1, perPage = 20): Promi
   return toPage(data.Page.pageInfo, data.Page.media);
 }
 
+/** AniList nests relations as `{ edges: [...] }`; we expose a flat array on Media. */
+type RawMediaDetail = Omit<Media, 'relations'> & {
+  relations?: { edges: MediaRelationEdge[] };
+};
+
 export async function getAnimeById(id: number): Promise<Media> {
-  const data = await anilistRequest<{ Media: Media }>(MEDIA_BY_ID_QUERY, { id });
-  return data.Media;
+  const data = await anilistRequest<{ Media: RawMediaDetail }>(MEDIA_BY_ID_QUERY, { id });
+  const { relations, ...media } = data.Media;
+  return { ...media, relations: relations?.edges ?? [] };
 }
 
 export async function getAiringSchedule(

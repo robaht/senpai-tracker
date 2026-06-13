@@ -25,6 +25,26 @@ export type MediaStatus =
 
 export type MediaSeason = 'WINTER' | 'SPRING' | 'SUMMER' | 'FALL';
 
+/**
+ * How one Media connects to another. AniList relations form a graph (no
+ * "season number"), so a linear S1→S2→S3 list is derived by walking
+ * PREQUEL/SEQUEL edges — see lib/relations.ts.
+ */
+export type MediaRelationType =
+  | 'SEQUEL'
+  | 'PREQUEL'
+  | 'PARENT'
+  | 'SIDE_STORY'
+  | 'SPIN_OFF'
+  | 'ALTERNATIVE'
+  | 'SUMMARY'
+  | 'ADAPTATION'
+  | 'CHARACTER'
+  | 'SOURCE'
+  | 'COMPILATION'
+  | 'CONTAINS'
+  | 'OTHER';
+
 export interface MediaTitle {
   romaji: string | null;
   english: string | null;
@@ -71,6 +91,18 @@ export interface Media {
   studios?: { nodes: { id: number; name: string }[] };
   nextAiringEpisode: AiringSchedule | null;
   trailer?: MediaTrailer | null;
+  /**
+   * Connected anime (sequels, prequels, side stories, …). Only populated on the
+   * detail query; flattened from AniList's `relations { edges { … } }` shape by
+   * getAnimeById. Absent elsewhere (and on relation nodes, to avoid recursion).
+   */
+  relations?: MediaRelationEdge[];
+}
+
+/** A single relation: how `node` connects to the anime it was fetched from. */
+export interface MediaRelationEdge {
+  relationType: MediaRelationType;
+  node: Media;
 }
 
 /** Airing schedule row used by the weekly schedule screen. */

@@ -20,9 +20,10 @@ so any one can be picked up cold and started smoothly.
 | F4 | Seasonal browser (any winter/spring/summer/fall) | P3 | S–M | — |
 | F5 | Recommender ("similar to X" / for you) | P2 | M | — |
 | F6 | Multiple themes (incl. cozy pastel) | P2 | M | Theme refactor |
+| F7 | Deep multi-hop season chain (full S1→S2→S3 ordering) | P3 | M | F2 |
 
 **Suggested build order** (fast value first, heavy infra last):
-`F2 → F4 → F5 → F6 → F1 → F3`. Quick AniList-data wins (F2/F4/F5) ship value with
+`F2 → F4 → F5 → F6 → F1 → F3 → F7`. Quick AniList-data wins (F2/F4/F5) ship value with
 no new infrastructure; F6 is a self-contained refactor; F1 + F3 are the
 foundational/infra-heavy pair. Reorder freely — entries are independent except
 where "Depends on" says otherwise.
@@ -201,3 +202,46 @@ a cozy, lighter pastel theme.
 - **Note:** a light/pastel theme is not an inversion — every color (text on light
   surfaces, overlays/scrims on posters, skeleton shades) needs a deliberate value
   and a contrast check. Budget time for visual QA per screen.
+
+---
+
+## F7 — Deep multi-hop season chain (full S1 → S2 → S3 ordering)
+
+**Goal:** From any anime, present the *complete* ordered run of seasons
+(S1 → S2 → S3 → S4 …), not just the direct prequel/sequel neighbors that F2 ships.
+
+### Requirements / acceptance criteria
+- [ ] The "Seasons" list spans the full chain in order, not only the immediate
+      prev/next entries — following sequels forward and prequels backward across
+      multiple hops.
+- [ ] The currently-viewed anime is clearly marked within the ordered chain.
+- [ ] Each season node is tappable into its detail and shows its tracked-status
+      dot (reuse `PosterCard`, as in F2).
+- [ ] Cycles and branches (e.g. a title with multiple sequels, or a
+      prequel/sequel loop) terminate cleanly with no infinite traversal or dupes.
+- [ ] Traversal respects AniList's rate limit and stays responsive: partial chain
+      renders as hops resolve rather than blocking on the whole walk.
+
+### Technical approach
+- Builds directly on F2's relations data. F2 leaves a `buildSeasonChain` helper in
+  `src/lib/relations.ts` that orders only *direct* PREQUEL/SEQUEL edges from one
+  fetched node. F7 generalizes it into a recursive walk: from the current node,
+  follow SEQUEL edges forward and PREQUEL edges backward, fetching each newly
+  discovered node's relations until the chain ends.
+- Each hop is another `getAnimeById` call (`src/api/anilist/index.ts`), which F2
+  already extends to return `relations`. Add a dedicated hook in
+  `src/api/anilist/hooks.ts` (e.g. `useSeasonChain(id)`) that orchestrates the
+  traversal on top of TanStack Query — reuse the existing `animeKeys.detail(id)`
+  cache so already-visited nodes are free, and cap concurrency/fan-out to respect
+  the ~90 req/min limit (batch + cache aggressively).
+- Track visited ids in a `Set` to guarantee termination on cycles; when a node has
+  multiple SEQUEL/PREQUEL edges (branch), pick the linear path (e.g. prefer the
+  same-`format` TV continuation) and surface the rest via F2's Related rail rather
+  than forcing them into the linear chain.
+- UI: promote F2's inline "Seasons" ordering in `app/anime/[id].tsx` (or its
+  `RelationsRail`/seasons component) to consume the resolved deep chain, rendering
+  progressively as hops arrive with a subtle loading affordance on the tail.
+- **Limitation to document:** AniList exposes relations only as a graph with no
+  season-number field, so the "correct" linear order is heuristic at branch
+  points. Deep walks are inherently multi-request — this is why F2 ships the cheap
+  single-fetch neighbors first and defers the full walk here.

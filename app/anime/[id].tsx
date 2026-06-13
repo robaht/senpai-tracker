@@ -20,6 +20,7 @@ import { Skeleton } from '../../src/components/ui/Skeleton';
 import { CountdownPill } from '../../src/components/CountdownPill';
 import { AddToListSheet } from '../../src/components/AddToListSheet';
 import { EmptyState } from '../../src/components/EmptyState';
+import { RelationsRail } from '../../src/components/RelationsRail';
 import { useAnime } from '../../src/api/anilist/hooks';
 import { displayTitle } from '../../src/api/anilist';
 import { useTrackEntry, useTrackingStore } from '../../src/features/tracking/store';
@@ -168,6 +169,9 @@ export default function AnimeDetailScreen() {
                 <InfoRow label="Popularity" value={`#${media.popularity.toLocaleString()}`} last />
               ) : null}
             </Card>
+
+            {/* Related anime / season chain */}
+            <RelationsRail media={media} />
           </View>
         )}
       </ScrollView>
