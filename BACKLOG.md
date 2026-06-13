@@ -18,22 +18,18 @@ so any one can be picked up cold and started smoothly.
 | F3 | New-season alerts for watched anime + Upcoming screen | P2 | M–L | Notif. infra, (F1 for true push) |
 | F4 | Seasonal browser (any winter/spring/summer/fall) | P3 | S–M | — |
 | F5 | Recommender ("similar to X" / for you) | P2 | M | — |
-| F6 | Multiple themes (incl. cozy pastel) | P2 | M | Theme refactor |
 | F7 | Deep multi-hop season chain (full S1→S2→S3 ordering) | P3 | M | — (extends shipped F2) |
 | F8 | Super Follow (per-title new-season announcement alerts) | P2 | M | Notif. infra, F1 (true push) |
 
 **Suggested build order** (fast value first, heavy infra last):
-`F4 → F5 → F6 → F1 → F3 → F7 → F8`. Quick AniList-data wins (F4/F5) ship value with
-no new infrastructure; F6 is a self-contained refactor; F1 + F3 are the
-foundational/infra-heavy pair. Reorder freely — entries are independent except
+`F4 → F5 → F1 → F3 → F7 → F8`. Quick AniList-data wins (F4/F5) ship value with
+no new infrastructure; F1 + F3 are the foundational/infra-heavy pair. Reorder freely — entries are independent except
 where "Depends on" says otherwise.
 
 ### Shared prerequisites (cross-cutting)
 - **Notifications infrastructure** (needed by F3): `expo-notifications` setup +
   a **development build** (push/scheduled notifications don't run in Expo Go on
   current SDKs). One-time setup, then reusable.
-- **Theme refactor** (needed by F6): move components off the static `colors`
-  import onto a `useTheme()` hook. Benefits everything.
 - **Cloud backend** (F1): also what enables *true* server-pushed alerts in F3.
 
 ---
@@ -147,34 +143,6 @@ announced or starts airing, surface it (and optionally notify).
   tally by frequency × rating, drop already-tracked ids, sort. Compute
   client-side; cache via TanStack Query and cap fan-out to respect rate limits.
 - Later upgrade: genre/tag affinity scoring computed from the user's list.
-
----
-
-## F6 — Multiple themes (incl. cozy pastel)
-
-**Goal:** Let users switch the app's look — at minimum the current dark theme and
-a cozy, lighter pastel theme.
-
-### Requirements / acceptance criteria
-- [ ] User can choose a theme from settings; choice persists across launches.
-- [ ] At least: "Midnight" (current dark) and "Cozy" (light pastel).
-- [ ] Optional "Follow system" (light/dark) mode.
-- [ ] All screens, the status bar, and gradients adapt; text stays legible
-      (contrast checked) in every theme.
-
-### Technical approach
-- **Refactor (the bulk of the work):** today components import `colors`
-  statically from `src/theme`. Introduce a `ThemeProvider` + `useTheme()` hook
-  returning the active palette, and migrate components to consume it instead of
-  the static import. `tokens.ts` already separates the raw `palette` from
-  semantic names (`colors`, `gradients`) — that's the clean swap surface; define
-  multiple palettes sharing the same shape.
-- Persist the selection with a small zustand store + AsyncStorage (same pattern
-  as tracking; could add a `PreferencesRepository`).
-- Drive `<StatusBar>` style and screen background from the active theme.
-- **Note:** a light/pastel theme is not an inversion — every color (text on light
-  surfaces, overlays/scrims on posters, skeleton shades) needs a deliberate value
-  and a contrast check. Budget time for visual QA per screen.
 
 ---
 
