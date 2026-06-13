@@ -1,18 +1,20 @@
 import { View, StyleSheet } from 'react-native';
-import { colors, radii } from '../theme';
+import { radii, useTheme } from '../theme';
 import { Text } from './ui/Text';
 import { formatScore } from '../lib/format';
 
-/** Small star + score chip shown on posters and detail. */
+/** Small star + score chip shown on posters and detail. Sits over artwork, so it
+ *  uses the constant on-media tokens (legible in light themes too). */
 export function ScoreBadge({ averageScore }: { averageScore: number | null }) {
+  const { colors } = useTheme();
   const score = formatScore(averageScore);
   if (!score) return null;
   return (
-    <View style={styles.badge}>
-      <Text variant="caption" color={colors.warning}>
+    <View style={[styles.badge, { backgroundColor: colors.mediaScrim }]}>
+      <Text variant="caption" color={colors.onMediaAmber}>
         ★
       </Text>
-      <Text variant="caption" color={colors.text}>
+      <Text variant="caption" color={colors.onMedia}>
         {score}
       </Text>
     </View>
@@ -27,6 +29,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: 7,
     paddingVertical: 3,
     borderRadius: radii.sm,
-    backgroundColor: 'rgba(7,7,12,0.7)',
   },
 });

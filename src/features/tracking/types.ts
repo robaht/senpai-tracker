@@ -1,4 +1,4 @@
-import { colors } from '../../theme';
+import type { ColorToken, ThemeColors } from '../../theme/tokens';
 
 /**
  * Watch statuses — deliberately identical to AniList's MediaListStatus enum.
@@ -48,11 +48,30 @@ export const WATCH_STATUSES: WatchStatus[] = [
   'REPEATING',
 ];
 
-export const STATUS_META: Record<WatchStatus, { label: string; short: string; color: string }> = {
-  CURRENT: { label: 'Watching', short: 'Watching', color: colors.accent },
-  PLANNING: { label: 'Plan to watch', short: 'Planned', color: colors.info },
-  COMPLETED: { label: 'Completed', short: 'Done', color: colors.positive },
-  PAUSED: { label: 'On hold', short: 'Hold', color: colors.warning },
-  DROPPED: { label: 'Dropped', short: 'Dropped', color: colors.danger },
-  REPEATING: { label: 'Rewatching', short: 'Rewatch', color: '#C04DFF' },
+export const STATUS_META: Record<WatchStatus, { label: string; short: string }> = {
+  CURRENT: { label: 'Watching', short: 'Watching' },
+  PLANNING: { label: 'Plan to watch', short: 'Planned' },
+  COMPLETED: { label: 'Completed', short: 'Done' },
+  PAUSED: { label: 'On hold', short: 'Hold' },
+  DROPPED: { label: 'Dropped', short: 'Dropped' },
+  REPEATING: { label: 'Rewatching', short: 'Rewatch' },
 };
+
+/**
+ * Maps each status to a semantic color *token*, resolved against the active
+ * theme at render time via `statusColor()`. Kept as token names (not literal
+ * colors) so status dots adapt to whatever theme is active.
+ */
+const STATUS_COLOR_TOKEN: Record<WatchStatus, ColorToken> = {
+  CURRENT: 'accent',
+  PLANNING: 'info',
+  COMPLETED: 'positive',
+  PAUSED: 'warning',
+  DROPPED: 'danger',
+  REPEATING: 'accentAlt',
+};
+
+/** Resolve a status's color from the active theme's palette. */
+export function statusColor(colors: ThemeColors, status: WatchStatus): string {
+  return colors[STATUS_COLOR_TOKEN[status]];
+}

@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { DimensionValue, StyleSheet, ViewStyle } from 'react-native';
+import { DimensionValue, ViewStyle } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -7,7 +7,7 @@ import Animated, {
   withTiming,
   Easing,
 } from 'react-native-reanimated';
-import { colors, radii } from '../../theme';
+import { radii, useTheme } from '../../theme';
 
 interface SkeletonProps {
   width?: DimensionValue;
@@ -18,6 +18,7 @@ interface SkeletonProps {
 
 /** A pulsing placeholder block shown while content loads. */
 export function Skeleton({ width = '100%', height = 16, radius = radii.sm, style }: SkeletonProps) {
+  const { colors } = useTheme();
   const opacity = useSharedValue(0.5);
 
   useEffect(() => {
@@ -33,17 +34,10 @@ export function Skeleton({ width = '100%', height = 16, radius = radii.sm, style
   return (
     <Animated.View
       style={[
-        styles.base,
-        { width, height, borderRadius: radius },
+        { backgroundColor: colors.skeletonBase, width, height, borderRadius: radius },
         animatedStyle,
         style,
       ]}
     />
   );
 }
-
-const styles = StyleSheet.create({
-  base: {
-    backgroundColor: colors.skeletonBase,
-  },
-});

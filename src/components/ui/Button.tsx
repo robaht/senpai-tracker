@@ -1,7 +1,7 @@
 import { ReactNode } from 'react';
 import { StyleSheet, View, ViewStyle, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { colors, gradients, radii, spacing } from '../../theme';
+import { radii, spacing, useTheme } from '../../theme';
 import { Text } from './Text';
 import { PressableScale } from './PressableScale';
 
@@ -32,14 +32,17 @@ export function Button({
   fullWidth,
   style,
 }: ButtonProps) {
+  const { colors, gradients } = useTheme();
+  const fg = variant === 'primary' ? colors.onAccent : colors.text;
+
   const content = (
     <View style={styles.content}>
       {loading ? (
-        <ActivityIndicator color={variant === 'primary' ? colors.onAccent : colors.text} />
+        <ActivityIndicator color={fg} />
       ) : (
         <>
           {icon}
-          <Text variant="callout" color={variant === 'primary' ? colors.onAccent : colors.text}>
+          <Text variant="callout" color={fg}>
             {label}
           </Text>
         </>
@@ -61,7 +64,11 @@ export function Button({
       <View
         style={[
           styles.base,
-          variant === 'secondary' && styles.secondary,
+          variant === 'secondary' && {
+            backgroundColor: colors.surfaceHigh,
+            borderWidth: StyleSheet.hairlineWidth,
+            borderColor: colors.borderStrong,
+          },
           variant === 'ghost' && styles.ghost,
           fullWidth && styles.fullWidth,
         ]}
@@ -94,11 +101,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-  },
-  secondary: {
-    backgroundColor: colors.surfaceHigh,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderStrong,
   },
   ghost: {
     backgroundColor: 'transparent',

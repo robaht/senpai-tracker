@@ -1,6 +1,6 @@
 import { ReactNode } from 'react';
 import { View, StyleSheet, ViewStyle } from 'react-native';
-import { colors, radii, spacing } from '../../theme';
+import { radii, spacing, useTheme } from '../../theme';
 
 interface CardProps {
   children: ReactNode;
@@ -12,11 +12,15 @@ interface CardProps {
 
 /** Rounded surface with a hairline border — the base for grouped content. */
 export function Card({ children, elevated, padded = true, style }: CardProps) {
+  const { colors } = useTheme();
   return (
     <View
       style={[
         styles.card,
-        { backgroundColor: elevated ? colors.surfaceElevated : colors.surface },
+        {
+          backgroundColor: elevated ? colors.surfaceElevated : colors.surface,
+          borderColor: colors.border,
+        },
         padded && styles.padded,
         style,
       ]}
@@ -30,7 +34,6 @@ const styles = StyleSheet.create({
   card: {
     borderRadius: radii.lg,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
     overflow: 'hidden',
   },
   padded: {

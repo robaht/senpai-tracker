@@ -1,35 +1,45 @@
 import { View, StyleSheet, ViewStyle } from 'react-native';
-import { colors, radii, spacing } from '../../theme';
+import { radii, spacing, useTheme } from '../../theme';
 import { Text } from './Text';
 
 interface BadgeProps {
   label: string;
   /** Accent color for the badge — defaults to a neutral surface chip. */
   color?: string;
-  /** Solid filled vs. tinted (translucent) treatment. */
-  variant?: 'tinted' | 'solid' | 'outline';
+  /**
+   * - `tinted`  — translucent fill of `color` (default).
+   * - `solid`   — opaque `color` fill with `onAccent` text.
+   * - `outline` — hairline ring of `color`.
+   * - `onMedia` — opaque dark chip with light text, for labels over artwork
+   *               (legible on any cover, in any theme); ignores `color`.
+   */
+  variant?: 'tinted' | 'solid' | 'outline' | 'onMedia';
   icon?: React.ReactNode;
   style?: ViewStyle;
 }
 
 /** Compact pill label — used for genres, formats, scores, statuses. */
-export function Badge({ label, color = colors.textMuted, variant = 'tinted', icon, style }: BadgeProps) {
+export function Badge({ label, color, variant = 'tinted', icon, style }: BadgeProps) {
+  const { colors } = useTheme();
+  const tint = color ?? colors.textMuted;
   const isSolid = variant === 'solid';
   const isOutline = variant === 'outline';
+  const isOnMedia = variant === 'onMedia';
   return (
     <View
       style={[
         styles.badge,
-        isSolid && { backgroundColor: color },
-        !isSolid && !isOutline && { backgroundColor: withAlpha(color, 0.16) },
-        isOutline && { borderWidth: 1, borderColor: withAlpha(color, 0.4) },
+        isSolid && { backgroundColor: tint },
+        isOnMedia && { backgroundColor: colors.mediaScrim },
+        !isSolid && !isOutline && !isOnMedia && { backgroundColor: withAlpha(tint, 0.16) },
+        isOutline && { borderWidth: 1, borderColor: withAlpha(tint, 0.4) },
         style,
       ]}
     >
       {icon}
       <Text
         variant="overline"
-        color={isSolid ? colors.onAccent : color}
+        color={isSolid ? colors.onAccent : isOnMedia ? colors.onMedia : tint}
         style={icon ? styles.labelWithIcon : undefined}
       >
         {label}

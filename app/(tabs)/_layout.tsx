@@ -2,24 +2,41 @@ import { Tabs } from 'expo-router';
 import { Platform, StyleSheet } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, fonts } from '../../src/theme';
+import { fonts, useTheme } from '../../src/theme';
+import { withAlpha } from '../../src/components/ui/Badge';
 
 export default function TabsLayout() {
+  const { colors, isDark } = useTheme();
+
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: colors.textFaint,
-        tabBarStyle: styles.tabBar,
+        tabBarStyle: [
+          styles.tabBar,
+          {
+            borderTopColor: colors.border,
+            // Translucent tint so the blur reads underneath on native; solid on web.
+            backgroundColor:
+              Platform.OS === 'web'
+                ? colors.bgDeep
+                : withAlpha(colors.bg, isDark ? 0.62 : 0.8),
+          },
+        ],
         tabBarLabelStyle: styles.label,
         tabBarItemStyle: styles.item,
-        // Blur the content behind the bar on native; falls back to the tinted
-        // background color on web.
         tabBarBackground:
           Platform.OS === 'web'
             ? undefined
-            : () => <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />,
+            : () => (
+                <BlurView
+                  intensity={40}
+                  tint={isDark ? 'dark' : 'light'}
+                  style={StyleSheet.absoluteFill}
+                />
+              ),
       }}
     >
       <Tabs.Screen
@@ -56,8 +73,6 @@ export default function TabsLayout() {
 const styles = StyleSheet.create({
   tabBar: {
     position: 'absolute',
-    backgroundColor: Platform.OS === 'web' ? colors.bgDeep : 'rgba(11,11,18,0.6)',
-    borderTopColor: colors.border,
     borderTopWidth: StyleSheet.hairlineWidth,
     height: Platform.OS === 'ios' ? 86 : 68,
     paddingTop: 8,

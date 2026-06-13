@@ -1,22 +1,28 @@
 import { useState } from 'react';
 import {
   View,
-  ScrollView,
   StyleSheet,
   Pressable,
   useWindowDimensions,
-  ActivityIndicator,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import Animated, {
+  interpolate,
+  useAnimatedScrollHandler,
+  useAnimatedStyle,
+  useSharedValue,
+} from 'react-native-reanimated';
 import { Text } from '../../src/components/ui/Text';
 import { Card } from '../../src/components/ui/Card';
 import { Badge } from '../../src/components/ui/Badge';
 import { Button } from '../../src/components/ui/Button';
 import { Skeleton } from '../../src/components/ui/Skeleton';
+import { withAlpha } from '../../src/components/ui/Badge';
 import { CountdownPill } from '../../src/components/CountdownPill';
 import { AddToListSheet } from '../../src/components/AddToListSheet';
 import { EmptyState } from '../../src/components/EmptyState';
@@ -24,9 +30,9 @@ import { RelationsRail } from '../../src/components/RelationsRail';
 import { useAnime } from '../../src/api/anilist/hooks';
 import { displayTitle } from '../../src/api/anilist';
 import { useTrackEntry, useTrackingStore } from '../../src/features/tracking/store';
-import { STATUS_META } from '../../src/features/tracking/types';
+import { STATUS_META, statusColor } from '../../src/features/tracking/types';
 import { formatScore, humanizeEnum, stripHtml } from '../../src/lib/format';
-import { colors, gradients, radii, spacing } from '../../src/theme';
+import { radii, spacing, makeStyles, useTheme } from '../../src/theme';
 
 export default function AnimeDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -34,6 +40,8 @@ export default function AnimeDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
+  const { colors, isDark } = useTheme();
+  const styles = useStyles();
 
   const { data: media, isLoading, isError } = useAnime(mediaId);
   const entry = useTrackEntry(mediaId);
@@ -42,11 +50,55 @@ export default function AnimeDetailScreen() {
 
   const bannerHeight = Math.min(width * 0.62, 320);
 
+  // Scroll drives the parallax banner and the fade-in title bar.
+  const scrollY = useSharedValue(0);
+  const onScroll = useAnimatedScrollHandler((e) => {
+    scrollY.value = e.contentOffset.y;
+  });
+
+  const bannerStyle = useAnimatedStyle(() => ({
+    transform: [
+      {
+        translateY: interpolate(
+          scrollY.value,
+          [-bannerHeight, 0, bannerHeight],
+          [-bannerHeight * 0.5, 0, bannerHeight * 0.3],
+          'clamp',
+        ),
+      },
+      { scale: interpolate(scrollY.value, [-bannerHeight, 0], [2, 1], 'clamp') },
+    ],
+  }));
+
+  const headerBarStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(
+      scrollY.value,
+      [bannerHeight * 0.45, bannerHeight * 0.75],
+      [0, 1],
+      'clamp',
+    ),
+  }));
+
+  // Fade the art into the active theme's background so the banner blends into
+  // the content surface in every theme (dark fades to ink, light to cream/white).
+  const bannerFade = ['transparent', withAlpha(colors.bg, 0.55), colors.bg] as const;
+
   return (
     <View style={styles.root}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-        {/* Banner */}
-        <View style={[styles.banner, { height: bannerHeight, backgroundColor: media?.coverImage?.color ?? colors.surface }]}>
+      <Animated.ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scroll}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+      >
+        {/* Parallax banner */}
+        <Animated.View
+          style={[
+            styles.banner,
+            { height: bannerHeight, backgroundColor: media?.coverImage?.color ?? colors.surface },
+            bannerStyle,
+          ]}
+        >
           {media && (
             <Image
               source={media.bannerImage ?? media.coverImage?.extraLarge ?? undefined}
@@ -55,8 +107,8 @@ export default function AnimeDetailScreen() {
               transition={300}
             />
           )}
-          <LinearGradient colors={gradients.poster} style={StyleSheet.absoluteFill} />
-        </View>
+          <LinearGradient colors={bannerFade} style={StyleSheet.absoluteFill} />
+        </Animated.View>
 
         {isLoading ? (
           <DetailSkeleton />
@@ -174,17 +226,39 @@ export default function AnimeDetailScreen() {
             <RelationsRail media={media} />
           </View>
         )}
-      </ScrollView>
+      </Animated.ScrollView>
+
+      {/* Fade-in title bar (purely visual; the floating back button handles taps). */}
+      <Animated.View
+        style={[styles.headerBar, { height: insets.top + 50 }, headerBarStyle]}
+      >
+        <BlurView
+          intensity={40}
+          tint={isDark ? 'dark' : 'light'}
+          style={StyleSheet.absoluteFill}
+        />
+        <View
+          style={[
+            StyleSheet.absoluteFill,
+            { backgroundColor: withAlpha(colors.bg, 0.7), borderBottomColor: colors.border, borderBottomWidth: StyleSheet.hairlineWidth },
+          ]}
+        />
+        <View style={[styles.headerBarContent, { paddingTop: insets.top }]}>
+          <Text variant="subheading" numberOfLines={1} style={styles.headerBarTitle}>
+            {media ? displayTitle(media.title) : ''}
+          </Text>
+        </View>
+      </Animated.View>
 
       {/* Floating back button */}
       <Pressable
         onPress={() => router.back()}
-        style={[styles.backBtn, { top: insets.top + spacing.sm }]}
+        style={[styles.backBtn, { backgroundColor: colors.mediaBorder, top: insets.top + spacing.sm }]}
         hitSlop={8}
         accessibilityRole="button"
         accessibilityLabel="Go back"
       >
-        <Ionicons name="chevron-back" size={24} color={colors.text} />
+        <Ionicons name="chevron-back" size={24} color={colors.onMedia} />
       </Pressable>
 
       <AddToListSheet media={media ?? null} visible={sheetOpen} onClose={() => setSheetOpen(false)} />
@@ -200,6 +274,8 @@ function TrackingPanel({
   mediaId: number;
   onChangeStatus: () => void;
 }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const entry = useTrackEntry(mediaId);
   const increment = useTrackingStore((s) => s.incrementProgress);
   const setProgress = useTrackingStore((s) => s.setProgress);
@@ -210,7 +286,7 @@ function TrackingPanel({
   return (
     <Card elevated style={styles.panel}>
       <Pressable style={styles.panelStatus} onPress={onChangeStatus}>
-        <View style={[styles.statusDot, { backgroundColor: meta.color }]} />
+        <View style={[styles.statusDot, { backgroundColor: statusColor(colors, entry.status) }]} />
         <Text variant="subheading">{meta.label}</Text>
         <Ionicons name="chevron-down" size={16} color={colors.textFaint} style={styles.panelChevron} />
       </Pressable>
@@ -244,6 +320,7 @@ function TrackingPanel({
 }
 
 function InfoRow({ label, value, last }: { label: string; value: string; last?: boolean }) {
+  const styles = useStyles();
   return (
     <View style={[styles.infoRow, !last && styles.infoBorder]}>
       <Text variant="callout" color="textFaint">
@@ -257,6 +334,7 @@ function InfoRow({ label, value, last }: { label: string; value: string; last?: 
 }
 
 function DetailSkeleton() {
+  const styles = useStyles();
   return (
     <View style={styles.content}>
       <View style={styles.headRow}>
@@ -273,7 +351,7 @@ function DetailSkeleton() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   root: { flex: 1, backgroundColor: colors.bg },
   scroll: { paddingBottom: spacing['5xl'] },
   banner: { width: '100%' },
@@ -352,14 +430,27 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   infoValue: { flex: 1, textAlign: 'right' },
+  headerBar: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    overflow: 'hidden',
+    pointerEvents: 'none',
+  },
+  headerBarContent: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 56,
+  },
+  headerBarTitle: { textAlign: 'center' },
   backBtn: {
     position: 'absolute',
     left: spacing.lg,
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(7,7,12,0.55)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-});
+}));

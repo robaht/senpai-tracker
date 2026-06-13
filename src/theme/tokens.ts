@@ -2,87 +2,16 @@
  * Design tokens — the single source of truth for the app's visual language.
  *
  * Everything visual references these values; nothing hard-codes a hex or a
- * magic number. Re-theming (e.g. a future light mode or alternate accent) is a
- * matter of swapping this object, which is why colors live behind semantic
- * names ("surface", "accent") rather than literal ones ("darkGray").
+ * magic number. The app ships several *themes* (see `themes` below). Spacing,
+ * radii, type and elevation are theme-invariant and exported directly; only
+ * `colors` and `gradients` change per theme and are resolved at runtime through
+ * `useTheme()` (never imported statically — that's what makes live theme
+ * switching possible).
  */
 
-const palette = {
-  // Neutrals — a near-black base with a subtle blue/violet cast.
-  ink900: '#07070C',
-  ink800: '#0B0B12',
-  ink700: '#12121C',
-  ink600: '#15151F',
-  ink500: '#1E1E2A',
-  ink400: '#272735',
-  ink300: '#343445',
-
-  white: '#FFFFFF',
-  cloud: '#F5F5FA',
-  fog: '#A4A4B8',
-  smoke: '#74748A',
-  ash: '#4C4C5E',
-
-  // Brand — violet → magenta → pink. The signature gradient.
-  violet: '#7C5CFF',
-  violetSoft: '#9B85FF',
-  magenta: '#C04DFF',
-  pink: '#FF5CA8',
-
-  // Semantic accents (also used to color watch statuses).
-  blue: '#4DA6FF',
-  mint: '#3DDC97',
-  amber: '#FFB020',
-  red: '#FF5C6E',
-} as const;
-
-export const colors = {
-  // Backgrounds
-  bg: palette.ink800,
-  bgDeep: palette.ink900,
-  surface: palette.ink600,
-  surfaceElevated: palette.ink500,
-  surfaceHigh: palette.ink400,
-
-  // Hairlines / borders
-  border: 'rgba(255,255,255,0.07)',
-  borderStrong: 'rgba(255,255,255,0.12)',
-
-  // Text
-  text: palette.cloud,
-  textMuted: palette.fog,
-  textFaint: palette.smoke,
-  textDisabled: palette.ash,
-
-  // Brand
-  accent: palette.violet,
-  accentSoft: palette.violetSoft,
-  onAccent: palette.white,
-
-  // Feedback
-  positive: palette.mint,
-  warning: palette.amber,
-  danger: palette.red,
-  info: palette.blue,
-
-  // Overlays / scrims used over poster art
-  scrim: 'rgba(7,7,12,0.0)',
-  scrimStrong: 'rgba(7,7,12,0.92)',
-
-  // Skeleton shimmer
-  skeletonBase: palette.ink500,
-  skeletonHighlight: palette.ink400,
-} as const;
-
-/** Gradients are expressed as ordered color stops for expo-linear-gradient. */
-export const gradients = {
-  brand: [palette.violet, palette.pink] as const,
-  brandVertical: [palette.magenta, palette.violet] as const,
-  // Bottom-up scrim placed over poster art so text stays legible.
-  poster: ['rgba(7,7,12,0)', 'rgba(7,7,12,0.55)', 'rgba(7,7,12,0.96)'] as const,
-  // Subtle top glow behind hero sections.
-  heroGlow: ['rgba(124,92,255,0.28)', 'rgba(124,92,255,0)'] as const,
-} as const;
+// ---------------------------------------------------------------------------
+// Theme-invariant tokens (identical in every theme)
+// ---------------------------------------------------------------------------
 
 export const spacing = {
   xs: 4,
@@ -149,14 +78,289 @@ export const shadow = {
   },
 } as const;
 
-export const theme = {
-  colors,
-  gradients,
-  spacing,
-  radii,
-  fonts,
-  typography,
-  shadow,
+// ---------------------------------------------------------------------------
+// On-media tokens — IDENTICAL in every theme.
+//
+// These colors sit *over poster artwork* (banners, covers), which is always
+// photographic/colorful regardless of theme. They must therefore stay a fixed
+// dark-scrim + light-foreground pairing in light themes too, or text over art
+// would become unreadable. Never use the theme's `text`/`warning` over media —
+// reach for these instead.
+// ---------------------------------------------------------------------------
+
+const onMedia = {
+  /** Primary foreground over artwork (titles on a banner). */
+  onMedia: '#FFFFFF',
+  /** Secondary foreground over artwork (meta rows). */
+  onMediaMuted: 'rgba(255,255,255,0.82)',
+  /** Score star over artwork — a constant warm gold. */
+  onMediaAmber: '#FFC24B',
+  /** Background for chips that float on artwork (score badge). */
+  mediaScrim: 'rgba(7,7,12,0.7)',
+  /** Hairline / ring color for elements on artwork (status dot ring, back btn). */
+  mediaBorder: 'rgba(7,7,12,0.55)',
+  /** Transparent → solid scrims, for gradient stops. */
+  scrim: 'rgba(7,7,12,0.0)',
+  scrimStrong: 'rgba(7,7,12,0.92)',
 } as const;
 
-export type Theme = typeof theme;
+/** Bottom-up scrim placed over poster art so text stays legible. Constant. */
+const POSTER_GRADIENT = ['rgba(7,7,12,0)', 'rgba(7,7,12,0.55)', 'rgba(7,7,12,0.96)'] as const;
+
+// ---------------------------------------------------------------------------
+// Per-theme color "chrome" — surfaces, text and accents that flip per theme.
+// ---------------------------------------------------------------------------
+
+interface Chrome {
+  // Backgrounds
+  bg: string;
+  bgDeep: string;
+  surface: string;
+  surfaceElevated: string;
+  surfaceHigh: string;
+  // Hairlines / borders
+  border: string;
+  borderStrong: string;
+  // Text
+  text: string;
+  textMuted: string;
+  textFaint: string;
+  textDisabled: string;
+  // Brand
+  accent: string;
+  /** A softer accent for secondary text/emphasis — LIGHTER than `accent` on
+   *  dark themes, DARKER on light themes, so it always reads on `surface`. */
+  accentSoft: string;
+  /** A second brand hue (used for the "Rewatching" status). */
+  accentAlt: string;
+  onAccent: string;
+  // Feedback (also color watch statuses)
+  positive: string;
+  warning: string;
+  danger: string;
+  info: string;
+  // Skeleton shimmer
+  skeletonBase: string;
+  skeletonHighlight: string;
+}
+
+interface GradientSet {
+  /** The signature accent gradient (buttons, avatar). */
+  brand: readonly [string, string];
+  brandVertical: readonly [string, string];
+  /** Soft top glow behind hero sections — accent fading to transparent. */
+  heroGlow: readonly [string, string];
+  /** Constant dark scrim over poster art. */
+  poster: readonly [string, string, string];
+}
+
+const MIDNIGHT: Chrome = {
+  bg: '#0B0B12',
+  bgDeep: '#07070C',
+  surface: '#15151F',
+  surfaceElevated: '#1E1E2A',
+  surfaceHigh: '#272735',
+  border: 'rgba(255,255,255,0.07)',
+  borderStrong: 'rgba(255,255,255,0.12)',
+  text: '#F5F5FA',
+  textMuted: '#A4A4B8',
+  textFaint: '#74748A',
+  textDisabled: '#4C4C5E',
+  accent: '#7C5CFF',
+  accentSoft: '#9B85FF',
+  accentAlt: '#C04DFF',
+  onAccent: '#FFFFFF',
+  positive: '#3DDC97',
+  warning: '#FFB020',
+  danger: '#FF5C6E',
+  info: '#4DA6FF',
+  skeletonBase: '#1E1E2A',
+  skeletonHighlight: '#272735',
+};
+
+const ABYSS: Chrome = {
+  bg: '#000000',
+  bgDeep: '#000000',
+  surface: '#0C0F14',
+  surfaceElevated: '#131922',
+  surfaceHigh: '#1D2430',
+  border: 'rgba(255,255,255,0.06)',
+  borderStrong: 'rgba(255,255,255,0.13)',
+  text: '#EAF1FB',
+  textMuted: '#94A3B8',
+  textFaint: '#5C6A7D',
+  textDisabled: '#3A4453',
+  accent: '#5B7CFF',
+  accentSoft: '#9DB3FF',
+  accentAlt: '#38E0FF',
+  onAccent: '#FFFFFF',
+  positive: '#34E5A0',
+  warning: '#FFC24B',
+  danger: '#FF6B81',
+  info: '#4DA6FF',
+  skeletonBase: '#131922',
+  skeletonHighlight: '#1D2430',
+};
+
+const SAKURA: Chrome = {
+  bg: '#150E18',
+  bgDeep: '#0E080F',
+  surface: '#241825',
+  surfaceElevated: '#2E1F30',
+  surfaceHigh: '#3B2A3D',
+  border: 'rgba(255,255,255,0.07)',
+  borderStrong: 'rgba(255,255,255,0.13)',
+  text: '#F8EEF4',
+  textMuted: '#CBA9BE',
+  textFaint: '#9A7E8D',
+  textDisabled: '#6B5462',
+  accent: '#FF6FA5',
+  accentSoft: '#FF9DC1',
+  accentAlt: '#C9A0FF',
+  onAccent: '#2A0A18',
+  positive: '#5FD6A0',
+  warning: '#FFC15E',
+  danger: '#FF6B81',
+  info: '#B58CFF',
+  skeletonBase: '#2E1F30',
+  skeletonHighlight: '#3B2A3D',
+};
+
+const COZY: Chrome = {
+  bg: '#F4EEE4',
+  bgDeep: '#EAE1D3',
+  surface: '#FFFFFF',
+  surfaceElevated: '#FFFFFF',
+  surfaceHigh: '#E9DFCF',
+  border: 'rgba(74,54,38,0.10)',
+  borderStrong: 'rgba(74,54,38,0.18)',
+  text: '#3B3027',
+  textMuted: '#6E6053',
+  textFaint: '#9E8E7D',
+  textDisabled: '#BEB2A2',
+  accent: '#7C5CFF',
+  accentSoft: '#6A4BE0',
+  accentAlt: '#C44DD9',
+  onAccent: '#FFFFFF',
+  positive: '#1FA873',
+  warning: '#C6820C',
+  danger: '#DD4A5C',
+  info: '#2E7DD6',
+  skeletonBase: '#E6DCCB',
+  skeletonHighlight: '#F1E9DC',
+};
+
+const DAYLIGHT: Chrome = {
+  bg: '#F3F5FA',
+  bgDeep: '#E7ECF4',
+  surface: '#FFFFFF',
+  surfaceElevated: '#FFFFFF',
+  surfaceHigh: '#E9EEF6',
+  border: 'rgba(20,30,60,0.10)',
+  borderStrong: 'rgba(20,30,60,0.16)',
+  text: '#151B27',
+  textMuted: '#515B6C',
+  textFaint: '#8A93A5',
+  textDisabled: '#B3BBC8',
+  accent: '#5B5BF5',
+  accentSoft: '#4A45D8',
+  accentAlt: '#B14DE0',
+  onAccent: '#FFFFFF',
+  positive: '#11936A',
+  warning: '#B7780F',
+  danger: '#DA3B53',
+  info: '#2D74E0',
+  skeletonBase: '#E4EAF3',
+  skeletonHighlight: '#EEF2F9',
+};
+
+/** The full color set a theme exposes = its chrome + the constant on-media tokens. */
+export type ThemeColors = Chrome & typeof onMedia;
+export type ThemeGradients = GradientSet;
+export type ColorToken = keyof ThemeColors;
+
+function buildColors(chrome: Chrome): ThemeColors {
+  return { ...chrome, ...onMedia };
+}
+
+function brandGradients(
+  brand: readonly [string, string],
+  brandVertical: readonly [string, string],
+  glowRgb: string,
+): GradientSet {
+  return {
+    brand,
+    brandVertical,
+    heroGlow: [`rgba(${glowRgb},0.26)`, `rgba(${glowRgb},0)`] as const,
+    poster: POSTER_GRADIENT,
+  };
+}
+
+export type ThemeName = 'midnight' | 'abyss' | 'sakura' | 'cozy' | 'daylight';
+
+export interface ThemeDef {
+  name: ThemeName;
+  label: string;
+  /** One-line flavor text shown under the name in Settings. */
+  blurb: string;
+  isDark: boolean;
+  colors: ThemeColors;
+  gradients: ThemeGradients;
+}
+
+export const themes: Record<ThemeName, ThemeDef> = {
+  midnight: {
+    name: 'midnight',
+    label: 'Midnight',
+    blurb: 'Violet & magenta on near-black',
+    isDark: true,
+    colors: buildColors(MIDNIGHT),
+    gradients: brandGradients(['#7C5CFF', '#FF5CA8'], ['#C04DFF', '#7C5CFF'], '124,92,255'),
+  },
+  abyss: {
+    name: 'abyss',
+    label: 'Abyss',
+    blurb: 'True-black OLED, electric blue',
+    isDark: true,
+    colors: buildColors(ABYSS),
+    gradients: brandGradients(['#5B7CFF', '#38E0FF'], ['#38E0FF', '#5B7CFF'], '91,124,255'),
+  },
+  sakura: {
+    name: 'sakura',
+    label: 'Sakura',
+    blurb: 'Plum night, cherry-blossom pink',
+    isDark: true,
+    colors: buildColors(SAKURA),
+    gradients: brandGradients(['#FF6FA5', '#FFA98A'], ['#FF6FA5', '#C9A0FF'], '255,111,165'),
+  },
+  cozy: {
+    name: 'cozy',
+    label: 'Cozy',
+    blurb: 'Warm cream & soft lavender',
+    isDark: false,
+    colors: buildColors(COZY),
+    gradients: brandGradients(['#8A6BFF', '#FF6FA5'], ['#8A6BFF', '#C44DD9'], '124,92,255'),
+  },
+  daylight: {
+    name: 'daylight',
+    label: 'Daylight',
+    blurb: 'Crisp white, indigo & teal',
+    isDark: false,
+    colors: buildColors(DAYLIGHT),
+    gradients: brandGradients(['#5B5BF5', '#2BB7D4'], ['#5B5BF5', '#B14DE0'], '91,91,245'),
+  },
+};
+
+/** Ordered list for the theme gallery (darks first, then lights). */
+export const THEME_LIST: ThemeDef[] = [
+  themes.midnight,
+  themes.abyss,
+  themes.sakura,
+  themes.cozy,
+  themes.daylight,
+];
+
+export const DEFAULT_THEME: ThemeName = 'midnight';
+
+/** Used by the pre-hydration splash, before the provider resolves a theme. */
+export const splashColor = themes[DEFAULT_THEME].colors.bg;

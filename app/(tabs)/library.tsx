@@ -6,8 +6,13 @@ import { withAlpha } from '../../src/components/ui/Badge';
 import { LibraryRow } from '../../src/components/LibraryRow';
 import { EmptyState } from '../../src/components/EmptyState';
 import { useTrackingStore } from '../../src/features/tracking/store';
-import { STATUS_META, WATCH_STATUSES, type WatchStatus } from '../../src/features/tracking/types';
-import { colors, spacing } from '../../src/theme';
+import {
+  STATUS_META,
+  WATCH_STATUSES,
+  statusColor,
+  type WatchStatus,
+} from '../../src/features/tracking/types';
+import { spacing, makeStyles, useTheme } from '../../src/theme';
 
 const BOTTOM_SPACE = 110;
 type Filter = WatchStatus | 'ALL';
@@ -15,6 +20,8 @@ type Filter = WatchStatus | 'ALL';
 export default function LibraryScreen() {
   const entries = useTrackingStore((s) => s.entries);
   const hydrated = useTrackingStore((s) => s.hydrated);
+  const { colors } = useTheme();
+  const styles = useStyles();
   const [filter, setFilter] = useState<Filter>('ALL');
 
   const all = useMemo(
@@ -57,7 +64,7 @@ export default function LibraryScreen() {
               label={STATUS_META[s].short}
               count={counts[s]}
               active={filter === s}
-              color={STATUS_META[s].color}
+              color={statusColor(colors, s)}
               onPress={() => setFilter(s)}
             />
           ))}
@@ -102,6 +109,8 @@ function Chip({
   color: string;
   onPress: () => void;
 }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   return (
     <Pressable
       onPress={onPress}
@@ -122,7 +131,7 @@ function Chip({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   headerWrap: {
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.md,
@@ -166,4 +175,4 @@ const styles = StyleSheet.create({
     height: StyleSheet.hairlineWidth,
     backgroundColor: colors.border,
   },
-});
+}));

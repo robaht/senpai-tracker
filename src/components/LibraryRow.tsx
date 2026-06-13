@@ -2,18 +2,20 @@ import { useRouter } from 'expo-router';
 import { Image } from 'expo-image';
 import { View, StyleSheet, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, radii, spacing } from '../theme';
+import { radii, spacing, useTheme } from '../theme';
 import { Text } from './ui/Text';
 import { Badge, withAlpha } from './ui/Badge';
 import { PressableScale } from './ui/PressableScale';
-import { STATUS_META, type TrackEntry } from '../features/tracking/types';
+import { STATUS_META, statusColor, type TrackEntry } from '../features/tracking/types';
 import { useTrackingStore } from '../features/tracking/store';
 
 /** A row in the Library: cover, title, status, progress bar + quick +1 control. */
 export function LibraryRow({ entry }: { entry: TrackEntry }) {
   const router = useRouter();
+  const { colors } = useTheme();
   const increment = useTrackingStore((s) => s.incrementProgress);
   const meta = STATUS_META[entry.status];
+  const color = statusColor(colors, entry.status);
 
   const total = entry.totalEpisodes;
   const pct = total ? Math.min(1, entry.progress / total) : entry.progress > 0 ? 0.05 : 0;
@@ -33,11 +35,11 @@ export function LibraryRow({ entry }: { entry: TrackEntry }) {
         <Text variant="subheading" numberOfLines={1}>
           {entry.title}
         </Text>
-        <Badge label={meta.short} color={meta.color} />
+        <Badge label={meta.short} color={color} />
 
         <View style={styles.progressRow}>
-          <View style={styles.track}>
-            <View style={[styles.fill, { width: `${pct * 100}%`, backgroundColor: meta.color }]} />
+          <View style={[styles.track, { backgroundColor: colors.surfaceHigh }]}>
+            <View style={[styles.fill, { width: `${pct * 100}%`, backgroundColor: color }]} />
           </View>
           <Text variant="caption" color="textMuted">
             {entry.progress}
@@ -52,14 +54,14 @@ export function LibraryRow({ entry }: { entry: TrackEntry }) {
         hitSlop={8}
         style={[
           styles.plus,
-          { backgroundColor: withAlpha(meta.color, atMax ? 0.06 : 0.18) },
+          { backgroundColor: withAlpha(color, atMax ? 0.06 : 0.18) },
         ]}
         accessibilityLabel="Increment episode progress"
       >
         <Ionicons
           name={atMax ? 'checkmark' : 'add'}
           size={20}
-          color={atMax ? colors.textFaint : meta.color}
+          color={atMax ? colors.textFaint : color}
         />
       </Pressable>
     </PressableScale>
@@ -94,7 +96,6 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 5,
     borderRadius: 3,
-    backgroundColor: colors.surfaceHigh,
     overflow: 'hidden',
   },
   fill: {

@@ -14,7 +14,8 @@ import {
 } from '@expo-google-fonts/plus-jakarta-sans';
 import { QueryProvider } from '../src/providers/QueryProvider';
 import { useTrackingStore } from '../src/features/tracking/store';
-import { colors } from '../src/theme';
+import { usePreferencesStore } from '../src/features/preferences/store';
+import { ThemeProvider, useTheme } from '../src/theme';
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
@@ -25,33 +26,53 @@ export default function RootLayout() {
     Jakarta_800: PlusJakartaSans_800ExtraBold,
   });
 
-  // Load the persisted watch list into memory once at startup.
-  const hydrate = useTrackingStore((s) => s.hydrate);
+  // Load persisted state into memory once at startup.
+  const hydrateTracking = useTrackingStore((s) => s.hydrate);
+  const hydratePrefs = usePreferencesStore((s) => s.hydrate);
+  const prefsHydrated = usePreferencesStore((s) => s.hydrated);
   useEffect(() => {
-    void hydrate();
-  }, [hydrate]);
+    void hydrateTracking();
+    void hydratePrefs();
+  }, [hydrateTracking, hydratePrefs]);
 
-  if (!fontsLoaded) {
-    return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
-  }
+  // Gate on prefs too, so a saved light theme doesn't flash the dark default.
+  const ready = fontsLoaded && prefsHydrated;
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <QueryProvider>
-          <StatusBar style="light" />
-          <Stack
-            screenOptions={{
-              headerShown: false,
-              contentStyle: { backgroundColor: colors.bg },
-              animation: 'slide_from_right',
-            }}
-          >
-            <Stack.Screen name="(tabs)" />
-            <Stack.Screen name="anime/[id]" options={{ animation: 'slide_from_bottom' }} />
-          </Stack>
+          <ThemeProvider>
+            <RootNavigator ready={ready} />
+          </ThemeProvider>
         </QueryProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
+  );
+}
+
+/** Lives inside ThemeProvider so the chrome (status bar, backgrounds) follows the theme. */
+function RootNavigator({ ready }: { ready: boolean }) {
+  const { colors, isDark } = useTheme();
+
+  if (!ready) {
+    return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
+  }
+
+  return (
+    <>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: colors.bg },
+          animation: 'slide_from_right',
+        }}
+      >
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="anime/[id]" options={{ animation: 'slide_from_bottom' }} />
+        <Stack.Screen name="settings" options={{ animation: 'slide_from_bottom' }} />
+      </Stack>
+    </>
   );
 }

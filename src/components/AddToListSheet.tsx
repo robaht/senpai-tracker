@@ -1,10 +1,10 @@
 import { Modal, Pressable, View, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, radii, spacing } from '../theme';
+import { radii, spacing, useTheme } from '../theme';
 import { Text } from './ui/Text';
 import { withAlpha } from './ui/Badge';
 import { displayTitle, type Media } from '../api/anilist';
-import { STATUS_META, WATCH_STATUSES, type WatchStatus } from '../features/tracking/types';
+import { STATUS_META, WATCH_STATUSES, statusColor, type WatchStatus } from '../features/tracking/types';
 import { useTrackEntry, useTrackingStore } from '../features/tracking/store';
 
 interface AddToListSheetProps {
@@ -16,6 +16,7 @@ interface AddToListSheetProps {
 /** Bottom-sheet status picker for adding / moving / removing an anime. */
 export function AddToListSheet({ media, visible, onClose }: AddToListSheetProps) {
   const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
   const entry = useTrackEntry(media?.id ?? -1);
   const track = useTrackingStore((s) => s.track);
   const untrack = useTrackingStore((s) => s.untrack);
@@ -30,8 +31,17 @@ export function AddToListSheet({ media, visible, onClose }: AddToListSheetProps)
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose} />
-      <View style={[styles.sheet, { paddingBottom: insets.bottom + spacing.lg }]}>
-        <View style={styles.handle} />
+      <View
+        style={[
+          styles.sheet,
+          {
+            backgroundColor: colors.surfaceElevated,
+            borderColor: colors.borderStrong,
+            paddingBottom: insets.bottom + spacing.lg,
+          },
+        ]}
+      >
+        <View style={[styles.handle, { backgroundColor: colors.borderStrong }]} />
         <Text variant="caption" color="textFaint" uppercase>
           Add to list
         </Text>
@@ -42,6 +52,7 @@ export function AddToListSheet({ media, visible, onClose }: AddToListSheetProps)
         <View style={styles.options}>
           {WATCH_STATUSES.map((status) => {
             const meta = STATUS_META[status];
+            const color = statusColor(colors, status);
             const active = entry?.status === status;
             return (
               <Pressable
@@ -49,16 +60,16 @@ export function AddToListSheet({ media, visible, onClose }: AddToListSheetProps)
                 onPress={() => choose(status)}
                 style={[
                   styles.option,
-                  { borderColor: active ? meta.color : colors.border },
-                  active && { backgroundColor: withAlpha(meta.color, 0.14) },
+                  { borderColor: active ? color : colors.border },
+                  active && { backgroundColor: withAlpha(color, 0.14) },
                 ]}
               >
-                <View style={[styles.optionDot, { backgroundColor: meta.color }]} />
+                <View style={[styles.optionDot, { backgroundColor: color }]} />
                 <Text variant="bodyMedium" color={active ? colors.text : colors.textMuted}>
                   {meta.label}
                 </Text>
                 {active && (
-                  <Text variant="callout" color={meta.color} style={styles.check}>
+                  <Text variant="callout" color={color} style={styles.check}>
                     ✓
                   </Text>
                 )}
@@ -99,20 +110,17 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: colors.surfaceElevated,
     borderTopLeftRadius: radii['2xl'],
     borderTopRightRadius: radii['2xl'],
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.md,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderStrong,
   },
   handle: {
     alignSelf: 'center',
     width: 40,
     height: 4,
     borderRadius: 2,
-    backgroundColor: colors.borderStrong,
     marginBottom: spacing.lg,
   },
   title: {

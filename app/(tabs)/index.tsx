@@ -1,16 +1,25 @@
 import { useMemo, useState } from 'react';
 import {
   View,
-  FlatList,
   StyleSheet,
   useWindowDimensions,
   ActivityIndicator,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import { Ionicons } from '@expo/vector-icons';
+import Animated, {
+  FadeIn,
+  interpolate,
+  useAnimatedScrollHandler,
+  useAnimatedStyle,
+  useSharedValue,
+  type SharedValue,
+} from 'react-native-reanimated';
 import { Screen } from '../../src/components/ui/Screen';
 import { Text } from '../../src/components/ui/Text';
 import { Skeleton } from '../../src/components/ui/Skeleton';
+import { PressableScale } from '../../src/components/ui/PressableScale';
 import { SearchBar } from '../../src/components/SearchBar';
 import { SectionHeader } from '../../src/components/SectionHeader';
 import { FeaturedCard } from '../../src/components/FeaturedCard';
@@ -18,7 +27,7 @@ import { PosterCard } from '../../src/components/PosterCard';
 import { EmptyState } from '../../src/components/EmptyState';
 import { useSeasonal, useTrending, useSearchAnime } from '../../src/api/anilist/hooks';
 import { currentSeason, type Media } from '../../src/api/anilist';
-import { colors, gradients, spacing } from '../../src/theme';
+import { spacing, useTheme } from '../../src/theme';
 
 const H_PADDING = spacing.xl;
 const COL_GAP = spacing.md;
@@ -26,6 +35,8 @@ const BOTTOM_SPACE = 110;
 
 export default function DiscoverScreen() {
   const { width } = useWindowDimensions();
+  const router = useRouter();
+  const { colors, gradients } = useTheme();
   const [query, setQuery] = useState('');
   const isSearching = query.trim().length >= 2;
 
@@ -42,23 +53,44 @@ export default function DiscoverScreen() {
   const featuredWidth = Math.min(width - H_PADDING * 2, 520);
 
   const seasonLabel = `${season.charAt(0) + season.slice(1).toLowerCase()} ${year}`;
-
   const gridData: Media[] = isSearching ? (search.data?.items ?? []) : (seasonal.data?.items ?? []);
+
+  // Vertical scroll drives the hero parallax/fade.
+  const scrollY = useSharedValue(0);
+  const onScroll = useAnimatedScrollHandler((e) => {
+    scrollY.value = e.contentOffset.y;
+  });
+
+  const glowStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(scrollY.value, [0, 160], [1, 0], 'clamp'),
+    transform: [{ translateY: scrollY.value * -0.4 }],
+  }));
+  const heroStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(scrollY.value, [0, 110], [1, 0], 'clamp'),
+    transform: [{ translateY: interpolate(scrollY.value, [0, 110], [0, -18], 'clamp') }],
+  }));
 
   return (
     <Screen>
-      <FlatList
+      {/* Accent glow behind the hero (uses the per-theme heroGlow gradient). */}
+      <Animated.View style={[styles.glowWrap, glowStyle]}>
+        <LinearGradient colors={gradients.heroGlow} style={StyleSheet.absoluteFill} />
+      </Animated.View>
+
+      <Animated.FlatList
         data={gridData}
-        keyExtractor={(item) => String(item.id)}
+        keyExtractor={(item: Media) => String(item.id)}
         numColumns={columns}
         key={columns} // remount if column count changes (orientation / web resize)
         columnWrapperStyle={styles.column}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        onScroll={onScroll}
+        scrollEventThrottle={16}
         ListHeaderComponent={
           <View style={styles.header}>
-            <View style={styles.topRow}>
+            <Animated.View style={[styles.topRow, heroStyle]}>
               <View>
                 <Text variant="overline" color="textFaint">
                   WELCOME BACK
@@ -70,13 +102,21 @@ export default function DiscoverScreen() {
                   </Text>
                 </Text>
               </View>
-              <LinearGradient
-                colors={gradients.brand}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.avatar}
-              />
-            </View>
+              <PressableScale
+                onPress={() => router.push('/settings')}
+                accessibilityRole="button"
+                accessibilityLabel="Settings and themes"
+              >
+                <LinearGradient
+                  colors={gradients.brand}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.avatar}
+                >
+                  <Ionicons name="color-palette" size={20} color={colors.onMedia} />
+                </LinearGradient>
+              </PressableScale>
+            </Animated.View>
 
             <SearchBar value={query} onChangeText={setQuery} />
 
@@ -86,17 +126,10 @@ export default function DiscoverScreen() {
                 {trending.isLoading ? (
                   <FeaturedSkeleton width={featuredWidth} />
                 ) : (
-                  <FlatList
-                    data={trending.data?.items.slice(0, 8) ?? []}
-                    keyExtractor={(item) => String(item.id)}
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    snapToInterval={featuredWidth + COL_GAP}
-                    decelerationRate="fast"
-                    contentContainerStyle={styles.carousel}
-                    renderItem={({ item, index }) => (
-                      <FeaturedCard media={item} width={featuredWidth} rank={index + 1} />
-                    )}
+                  <TrendingCarousel
+                    items={trending.data?.items.slice(0, 8) ?? []}
+                    width={featuredWidth}
+                    gap={COL_GAP}
                   />
                 )}
               </View>
@@ -110,7 +143,7 @@ export default function DiscoverScreen() {
             </View>
           </View>
         }
-        renderItem={({ item }) => (
+        renderItem={({ item }: { item: Media }) => (
           <Animated.View entering={FadeIn.duration(250)} style={{ width: posterWidth }}>
             <PosterCard media={item} width={posterWidth} />
           </Animated.View>
@@ -135,6 +168,58 @@ export default function DiscoverScreen() {
   );
 }
 
+/** Horizontal trending rail where the centered card is emphasized as you scroll. */
+function TrendingCarousel({ items, width, gap }: { items: Media[]; width: number; gap: number }) {
+  const interval = width + gap;
+  const scrollX = useSharedValue(0);
+  const onScroll = useAnimatedScrollHandler((e) => {
+    scrollX.value = e.contentOffset.x;
+  });
+
+  return (
+    <Animated.FlatList
+      data={items}
+      keyExtractor={(item: Media) => String(item.id)}
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      snapToInterval={interval}
+      decelerationRate="fast"
+      contentContainerStyle={styles.carousel}
+      onScroll={onScroll}
+      scrollEventThrottle={16}
+      renderItem={({ item, index }: { item: Media; index: number }) => (
+        <FocusCard scrollX={scrollX} index={index} interval={interval} width={width}>
+          <FeaturedCard media={item} width={width} rank={index + 1} />
+        </FocusCard>
+      )}
+    />
+  );
+}
+
+/** Scales + fades a carousel child based on its distance from the snapped position. */
+function FocusCard({
+  scrollX,
+  index,
+  interval,
+  width,
+  children,
+}: {
+  scrollX: SharedValue<number>;
+  index: number;
+  interval: number;
+  width: number;
+  children: React.ReactNode;
+}) {
+  const animStyle = useAnimatedStyle(() => {
+    const input = [(index - 1) * interval, index * interval, (index + 1) * interval];
+    return {
+      transform: [{ scale: interpolate(scrollX.value, input, [0.93, 1, 0.93], 'clamp') }],
+      opacity: interpolate(scrollX.value, input, [0.6, 1, 0.6], 'clamp'),
+    };
+  });
+  return <Animated.View style={[{ width }, animStyle]}>{children}</Animated.View>;
+}
+
 function FeaturedSkeleton({ width }: { width: number }) {
   return <Skeleton width={width} height={width * 0.625} radius={20} />;
 }
@@ -153,6 +238,14 @@ function PosterGridSkeleton({ width, columns }: { width: number; columns: number
 }
 
 const styles = StyleSheet.create({
+  glowWrap: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 340,
+    pointerEvents: 'none',
+  },
   content: {
     paddingHorizontal: H_PADDING,
     paddingBottom: BOTTOM_SPACE,
@@ -160,7 +253,6 @@ const styles = StyleSheet.create({
   header: {
     paddingTop: spacing.md,
     gap: spacing.xl,
-    marginHorizontal: -0, // keep header aligned with grid padding
   },
   topRow: {
     flexDirection: 'row',
@@ -171,6 +263,8 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   trendingBlock: {
     gap: 0,

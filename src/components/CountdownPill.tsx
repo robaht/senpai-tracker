@@ -1,5 +1,5 @@
 import { View, StyleSheet } from 'react-native';
-import { colors, radii, spacing } from '../theme';
+import { radii, spacing, useTheme } from '../theme';
 import { Text } from './ui/Text';
 import { withAlpha } from './ui/Badge';
 import { formatCountdown } from '../lib/format';
@@ -13,10 +13,11 @@ export function CountdownPill({
   next: AiringSchedule;
   compact?: boolean;
 }) {
+  const { colors } = useTheme();
   const countdown = formatCountdown(next.timeUntilAiring);
   return (
     <View style={[styles.pill, { backgroundColor: withAlpha(colors.accent, 0.16) }]}>
-      <View style={styles.dot} />
+      <View style={[styles.dot, { backgroundColor: colors.accent }]} />
       <Text variant="caption" color={colors.accentSoft}>
         {compact ? `EP ${next.episode}` : `EP ${next.episode} · `}
         {!compact && <Text variant="caption" color={colors.text}>{`in ${countdown}`}</Text>}
@@ -40,6 +41,5 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: colors.accent,
   },
 });

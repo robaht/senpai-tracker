@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
 import { Image } from 'expo-image';
 import { View, StyleSheet } from 'react-native';
-import { colors, radii, spacing } from '../theme';
+import { radii, spacing, useTheme } from '../theme';
 import { Text } from './ui/Text';
 import { PressableScale } from './ui/PressableScale';
 import { displayTitle, type AiringScheduleItem } from '../api/anilist';
@@ -11,6 +11,7 @@ import { airingTimeLabel, formatCountdown, humanizeEnum } from '../lib/format';
 /** One airing in the weekly schedule: cover, title, episode + countdown. */
 export function ScheduleRow({ item }: { item: AiringScheduleItem }) {
   const router = useRouter();
+  const { colors } = useTheme();
   const tracked = useIsTracked(item.media.id);
   const uri = item.media.coverImage?.large ?? item.media.coverImage?.extraLarge ?? undefined;
   const secondsUntil = item.airingAt - Math.floor(Date.now() / 1000);
@@ -30,7 +31,7 @@ export function ScheduleRow({ item }: { item: AiringScheduleItem }) {
           {displayTitle(item.media.title)}
         </Text>
         <View style={styles.metaRow}>
-          {tracked && <View style={styles.trackedDot} />}
+          {tracked && <View style={[styles.trackedDot, { backgroundColor: colors.accent }]} />}
           <Text variant="caption" color="textFaint">
             {humanizeEnum(item.media.format) || 'Anime'}
           </Text>
@@ -79,7 +80,6 @@ const styles = StyleSheet.create({
     width: 7,
     height: 7,
     borderRadius: 4,
-    backgroundColor: colors.accent,
   },
   right: {
     alignItems: 'flex-end',

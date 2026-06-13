@@ -1,5 +1,5 @@
 import { View, TextInput, StyleSheet, Pressable } from 'react-native';
-import { colors, radii, spacing, fonts } from '../theme';
+import { radii, spacing, fonts, useTheme } from '../theme';
 import { Text } from './ui/Text';
 
 interface SearchBarProps {
@@ -10,8 +10,9 @@ interface SearchBarProps {
 
 /** Rounded search field with a leading glyph and clear button. */
 export function SearchBar({ value, onChangeText, placeholder = 'Search anime…' }: SearchBarProps) {
+  const { colors } = useTheme();
   return (
-    <View style={styles.wrap}>
+    <View style={[styles.wrap, { backgroundColor: colors.surface, borderColor: colors.border }]}>
       <Text variant="subheading" color="textFaint" style={styles.icon}>
         ⌕
       </Text>
@@ -20,7 +21,7 @@ export function SearchBar({ value, onChangeText, placeholder = 'Search anime…'
         onChangeText={onChangeText}
         placeholder={placeholder}
         placeholderTextColor={colors.textFaint}
-        style={styles.input}
+        style={[styles.input, { color: colors.text }]}
         autoCorrect={false}
         autoCapitalize="none"
         returnKeyType="search"
@@ -41,10 +42,8 @@ const styles = StyleSheet.create({
   wrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surface,
     borderRadius: radii.md,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
     paddingHorizontal: spacing.md,
     height: 48,
     gap: spacing.sm,
@@ -54,7 +53,6 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    color: colors.text,
     fontFamily: fonts.medium,
     fontSize: 15,
     height: '100%',

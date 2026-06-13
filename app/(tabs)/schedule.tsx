@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { View, SectionList, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
+import { View, SectionList, StyleSheet, Pressable } from 'react-native';
 import { Screen } from '../../src/components/ui/Screen';
 import { Text } from '../../src/components/ui/Text';
 import { Skeleton } from '../../src/components/ui/Skeleton';
@@ -10,13 +10,14 @@ import { useAiringSchedule } from '../../src/api/anilist/hooks';
 import { useTrackingStore } from '../../src/features/tracking/store';
 import { airingDayLabel } from '../../src/lib/format';
 import type { AiringScheduleItem } from '../../src/api/anilist';
-import { colors, spacing } from '../../src/theme';
+import { spacing, makeStyles, useTheme } from '../../src/theme';
 
 const BOTTOM_SPACE = 110;
 
 export default function ScheduleScreen() {
   const { data, isLoading, isError, refetch } = useAiringSchedule(7);
   const entries = useTrackingStore((s) => s.entries);
+  const styles = useStyles();
   const [onlyTracked, setOnlyTracked] = useState(false);
 
   const sections = useMemo(() => {
@@ -97,6 +98,8 @@ function FilterPill({
   active: boolean;
   onPress: () => void;
 }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   return (
     <Pressable
       onPress={onPress}
@@ -113,6 +116,7 @@ function FilterPill({
 }
 
 function ScheduleSkeleton() {
+  const styles = useStyles();
   return (
     <View style={styles.content}>
       {Array.from({ length: 6 }).map((_, i) => (
@@ -128,7 +132,7 @@ function ScheduleSkeleton() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   headerWrap: {
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.md,
@@ -170,4 +174,4 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: spacing.sm,
   },
-});
+}));

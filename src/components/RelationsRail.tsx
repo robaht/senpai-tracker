@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { View, FlatList, StyleSheet, useWindowDimensions } from 'react-native';
-import { colors, spacing } from '../theme';
+import { spacing, useTheme } from '../theme';
 import { Badge } from './ui/Badge';
 import { PosterCard } from './PosterCard';
 import { SectionHeader } from './SectionHeader';
@@ -76,8 +76,8 @@ function RelationCard({ edge, width }: { edge: MediaRelationEdge; width: number 
   return (
     <View style={{ width }}>
       <PosterCard media={edge.node} width={width} />
-      <View style={styles.badgeSlot} pointerEvents="none">
-        <Badge label={humanizeEnum(edge.relationType)} color={colors.surfaceHigh} variant="solid" />
+      <View style={styles.badgeSlot}>
+        <Badge label={humanizeEnum(edge.relationType)} variant="onMedia" />
       </View>
     </View>
   );
@@ -93,11 +93,12 @@ function SeasonCard({
   width: number;
   isCurrent: boolean;
 }) {
+  const { colors } = useTheme();
   return (
     <View style={{ width }}>
       <PosterCard media={media} width={width} />
       {isCurrent && (
-        <View style={styles.badgeSlot} pointerEvents="none">
+        <View style={styles.badgeSlot}>
           <Badge label="Current" color={colors.accent} variant="solid" />
         </View>
       )}
@@ -112,5 +113,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: spacing.xs + 2,
     left: spacing.xs + 2,
+    pointerEvents: 'none',
   },
 });
