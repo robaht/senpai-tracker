@@ -21,9 +21,10 @@ so any one can be picked up cold and started smoothly.
 | F5 | Recommender ("similar to X" / for you) | P2 | M | — |
 | F6 | Multiple themes (incl. cozy pastel) | P2 | M | Theme refactor |
 | F7 | Deep multi-hop season chain (full S1→S2→S3 ordering) | P3 | M | F2 |
+| F8 | Super Follow (per-title new-season announcement alerts) | P2 | M | F2, Notif. infra, F1 (true push) |
 
 **Suggested build order** (fast value first, heavy infra last):
-`F2 → F4 → F5 → F6 → F1 → F3 → F7`. Quick AniList-data wins (F2/F4/F5) ship value with
+`F2 → F4 → F5 → F6 → F1 → F3 → F7 → F8`. Quick AniList-data wins (F2/F4/F5) ship value with
 no new infrastructure; F6 is a self-contained refactor; F1 + F3 are the
 foundational/infra-heavy pair. Reorder freely — entries are independent except
 where "Depends on" says otherwise.
@@ -245,3 +246,55 @@ a cozy, lighter pastel theme.
   season-number field, so the "correct" linear order is heuristic at branch
   points. Deep walks are inherently multi-request — this is why F2 ships the cheap
   single-fetch neighbors first and defers the full walk here.
+
+---
+
+## F8 — Super Follow (per-title new-season announcement alerts)
+
+**Goal:** Let a user explicitly "Super Follow" a specific title and get notified
+the moment a new season/sequel of it is *announced* on AniList — not just when it
+starts airing.
+
+### How this differs from F3
+F3 passively surfaces upcoming sequels for the user's whole list in an "Upcoming"
+screen and offers air-date reminders. F8 is an **explicit, per-title opt-in** with
+a stronger promise: alert at *announcement* time (the instant a SEQUEL relation
+with status `NOT_YET_RELEASED` appears), for just the handful of titles the user
+deliberately marked. F3 is breadth; F8 is a sharp, user-chosen signal. They share
+the same detection plumbing and notification infra.
+
+### Requirements / acceptance criteria
+- [ ] From a title's detail screen, the user can toggle "Super Follow" on/off
+      (independent of whether the title is on their watch list).
+- [ ] Super-followed titles are listed somewhere the user can review/manage them.
+- [ ] When a new sequel/season of a super-followed title is announced, the user is
+      alerted — even if they haven't watched/completed it.
+- [ ] Each announcement alerts exactly once: no repeat alerts for a season already
+      surfaced, and no alert for sequels that existed when the follow was created.
+- [ ] Toggling off stops all alerts for that title.
+- [ ] Works offline-tolerantly: the follow set persists locally and survives
+      relaunch.
+
+### Technical approach
+- **Follow set (local):** add a small store + repository alongside tracking
+  (`src/features/tracking/` is the pattern — a `SuperFollowRepository` persisting a
+  `Set<mediaId>` under a `senpai:superfollow:v1` AsyncStorage key, exposed via a
+  zustand store like `useTrackingStore`). A super-follow is just a media id, so it
+  doesn't require the title to be a `TrackEntry`.
+- **Snapshot for dup-free detection:** on follow, store the set of currently-known
+  SEQUEL/child relation node ids for that title (from F2's `relations`, fetched via
+  `getAnimeById` / `MEDIA_BY_ID_QUERY`). "New announcement" = a SEQUEL node id not
+  in the stored snapshot. Update the snapshot when an alert fires so it never
+  repeats.
+- **Detection on app-open (no backend):** a hook (e.g. `useSuperFollowChecks` in
+  `src/api/anilist/`) batch-fetches relations for the followed ids, diffs against
+  the stored snapshots, and schedules a local notification for any new sequel —
+  reusing F3's `expo-notifications` setup (needs the dev build). Batch + cache via
+  TanStack Query to respect the ~90 req/min limit.
+- **True announcement push (app closed):** requires a server polling AniList for
+  the followed ids and pushing when a new relation appears — this is the F1 backend
+  + push-token plumbing. Document that without F1, detection is app-open only
+  (same limitation noted in F3).
+- **UI:** a bell/"Super Follow" toggle in `app/anime/[id].tsx` (near the
+  Add-to-list action), and a managed list (a section in Library or a dedicated
+  screen) reusing `PosterCard`.
