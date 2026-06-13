@@ -1,0 +1,361 @@
+import { useState } from 'react';
+import {
+  View,
+  ScrollView,
+  StyleSheet,
+  Pressable,
+  useWindowDimensions,
+  ActivityIndicator,
+} from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import { Text } from '../../src/components/ui/Text';
+import { Card } from '../../src/components/ui/Card';
+import { Badge } from '../../src/components/ui/Badge';
+import { Button } from '../../src/components/ui/Button';
+import { Skeleton } from '../../src/components/ui/Skeleton';
+import { CountdownPill } from '../../src/components/CountdownPill';
+import { AddToListSheet } from '../../src/components/AddToListSheet';
+import { EmptyState } from '../../src/components/EmptyState';
+import { useAnime } from '../../src/api/anilist/hooks';
+import { displayTitle } from '../../src/api/anilist';
+import { useTrackEntry, useTrackingStore } from '../../src/features/tracking/store';
+import { STATUS_META } from '../../src/features/tracking/types';
+import { formatScore, humanizeEnum, stripHtml } from '../../src/lib/format';
+import { colors, gradients, radii, spacing } from '../../src/theme';
+
+export default function AnimeDetailScreen() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const mediaId = Number(id);
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+
+  const { data: media, isLoading, isError } = useAnime(mediaId);
+  const entry = useTrackEntry(mediaId);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [descExpanded, setDescExpanded] = useState(false);
+
+  const bannerHeight = Math.min(width * 0.62, 320);
+
+  return (
+    <View style={styles.root}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+        {/* Banner */}
+        <View style={[styles.banner, { height: bannerHeight, backgroundColor: media?.coverImage?.color ?? colors.surface }]}>
+          {media && (
+            <Image
+              source={media.bannerImage ?? media.coverImage?.extraLarge ?? undefined}
+              style={StyleSheet.absoluteFill}
+              contentFit="cover"
+              transition={300}
+            />
+          )}
+          <LinearGradient colors={gradients.poster} style={StyleSheet.absoluteFill} />
+        </View>
+
+        {isLoading ? (
+          <DetailSkeleton />
+        ) : isError || !media ? (
+          <EmptyState emoji="😵" title="Couldn't load this title" subtitle="Please try again later." />
+        ) : (
+          <View style={styles.content}>
+            {/* Poster + title header */}
+            <View style={styles.headRow}>
+              <View style={[styles.posterWrap, { backgroundColor: media.coverImage?.color ?? colors.surface }]}>
+                <Image
+                  source={media.coverImage?.extraLarge ?? media.coverImage?.large ?? undefined}
+                  style={styles.poster}
+                  contentFit="cover"
+                  transition={250}
+                />
+              </View>
+              <View style={styles.headInfo}>
+                <Text variant="title" numberOfLines={3}>
+                  {displayTitle(media.title)}
+                </Text>
+                {media.title.native && (
+                  <Text variant="caption" color="textFaint" numberOfLines={1}>
+                    {media.title.native}
+                  </Text>
+                )}
+                <View style={styles.metaRow}>
+                  {formatScore(media.averageScore) && (
+                    <Text variant="callout" color={colors.warning}>
+                      ★ {formatScore(media.averageScore)}
+                    </Text>
+                  )}
+                  {media.format && (
+                    <Text variant="callout" color="textMuted">
+                      {humanizeEnum(media.format)}
+                    </Text>
+                  )}
+                  {media.episodes != null && (
+                    <Text variant="callout" color="textMuted">
+                      {media.episodes} eps
+                    </Text>
+                  )}
+                </View>
+              </View>
+            </View>
+
+            {media.nextAiringEpisode && (
+              <View style={styles.airing}>
+                <CountdownPill next={media.nextAiringEpisode} />
+              </View>
+            )}
+
+            {/* Primary action / tracking state */}
+            {entry ? (
+              <TrackingPanel mediaId={mediaId} onChangeStatus={() => setSheetOpen(true)} />
+            ) : (
+              <Button
+                label="Add to list"
+                fullWidth
+                icon={<Ionicons name="add" size={20} color={colors.onAccent} />}
+                onPress={() => setSheetOpen(true)}
+                style={styles.addBtn}
+              />
+            )}
+
+            {/* Genres */}
+            {media.genres.length > 0 && (
+              <View style={styles.genres}>
+                {media.genres.map((g) => (
+                  <Badge key={g} label={g} color={colors.accentSoft} />
+                ))}
+              </View>
+            )}
+
+            {/* Synopsis */}
+            {media.description && (
+              <View style={styles.section}>
+                <Text variant="heading" style={styles.sectionTitle}>
+                  Synopsis
+                </Text>
+                <Text
+                  variant="body"
+                  color="textMuted"
+                  numberOfLines={descExpanded ? undefined : 4}
+                >
+                  {stripHtml(media.description)}
+                </Text>
+                <Pressable onPress={() => setDescExpanded((v) => !v)} hitSlop={8}>
+                  <Text variant="callout" color={colors.accent} style={styles.readMore}>
+                    {descExpanded ? 'Show less' : 'Read more'}
+                  </Text>
+                </Pressable>
+              </View>
+            )}
+
+            {/* Info card */}
+            <Card style={styles.section}>
+              <InfoRow label="Status" value={humanizeEnum(media.status) || '—'} />
+              {media.studios?.nodes?.length ? (
+                <InfoRow label="Studio" value={media.studios.nodes.map((s) => s.name).join(', ')} />
+              ) : null}
+              {media.season && media.seasonYear ? (
+                <InfoRow
+                  label="Season"
+                  value={`${media.season.charAt(0) + media.season.slice(1).toLowerCase()} ${media.seasonYear}`}
+                />
+              ) : null}
+              {media.duration ? <InfoRow label="Episode length" value={`${media.duration} min`} /> : null}
+              {media.popularity ? (
+                <InfoRow label="Popularity" value={`#${media.popularity.toLocaleString()}`} last />
+              ) : null}
+            </Card>
+          </View>
+        )}
+      </ScrollView>
+
+      {/* Floating back button */}
+      <Pressable
+        onPress={() => router.back()}
+        style={[styles.backBtn, { top: insets.top + spacing.sm }]}
+        hitSlop={8}
+        accessibilityRole="button"
+        accessibilityLabel="Go back"
+      >
+        <Ionicons name="chevron-back" size={24} color={colors.text} />
+      </Pressable>
+
+      <AddToListSheet media={media ?? null} visible={sheetOpen} onClose={() => setSheetOpen(false)} />
+    </View>
+  );
+}
+
+/** Inline tracking controls shown when an anime is already on the list. */
+function TrackingPanel({
+  mediaId,
+  onChangeStatus,
+}: {
+  mediaId: number;
+  onChangeStatus: () => void;
+}) {
+  const entry = useTrackEntry(mediaId);
+  const increment = useTrackingStore((s) => s.incrementProgress);
+  const setProgress = useTrackingStore((s) => s.setProgress);
+  if (!entry) return null;
+  const meta = STATUS_META[entry.status];
+  const atMax = entry.totalEpisodes != null && entry.progress >= entry.totalEpisodes;
+
+  return (
+    <Card elevated style={styles.panel}>
+      <Pressable style={styles.panelStatus} onPress={onChangeStatus}>
+        <View style={[styles.statusDot, { backgroundColor: meta.color }]} />
+        <Text variant="subheading">{meta.label}</Text>
+        <Ionicons name="chevron-down" size={16} color={colors.textFaint} style={styles.panelChevron} />
+      </Pressable>
+
+      <View style={styles.stepper}>
+        <Pressable
+          onPress={() => setProgress(mediaId, entry.progress - 1)}
+          disabled={entry.progress <= 0}
+          style={[styles.stepBtn, entry.progress <= 0 && styles.stepDisabled]}
+          hitSlop={6}
+        >
+          <Ionicons name="remove" size={20} color={colors.text} />
+        </Pressable>
+        <View style={styles.stepCount}>
+          <Text variant="heading">{entry.progress}</Text>
+          <Text variant="caption" color="textFaint">
+            {entry.totalEpisodes ? `of ${entry.totalEpisodes}` : 'episodes'}
+          </Text>
+        </View>
+        <Pressable
+          onPress={() => increment(mediaId)}
+          disabled={atMax}
+          style={[styles.stepBtn, styles.stepBtnPrimary, atMax && styles.stepDisabled]}
+          hitSlop={6}
+        >
+          <Ionicons name="add" size={20} color={colors.onAccent} />
+        </Pressable>
+      </View>
+    </Card>
+  );
+}
+
+function InfoRow({ label, value, last }: { label: string; value: string; last?: boolean }) {
+  return (
+    <View style={[styles.infoRow, !last && styles.infoBorder]}>
+      <Text variant="callout" color="textFaint">
+        {label}
+      </Text>
+      <Text variant="callout" style={styles.infoValue} numberOfLines={2}>
+        {value}
+      </Text>
+    </View>
+  );
+}
+
+function DetailSkeleton() {
+  return (
+    <View style={styles.content}>
+      <View style={styles.headRow}>
+        <Skeleton width={108} height={162} radius={radii.md} />
+        <View style={styles.headInfo}>
+          <Skeleton width="90%" height={24} />
+          <Skeleton width="50%" height={14} />
+          <Skeleton width="70%" height={14} />
+        </View>
+      </View>
+      <Skeleton width="100%" height={50} radius={radii.md} style={{ marginTop: spacing.xl }} />
+      <Skeleton width="100%" height={120} radius={radii.lg} style={{ marginTop: spacing.xl }} />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.bg },
+  scroll: { paddingBottom: spacing['5xl'] },
+  banner: { width: '100%' },
+  content: {
+    paddingHorizontal: spacing.xl,
+    marginTop: -64, // pull poster up over the banner
+  },
+  headRow: {
+    flexDirection: 'row',
+    gap: spacing.lg,
+    alignItems: 'flex-end',
+  },
+  posterWrap: {
+    width: 108,
+    height: 162,
+    borderRadius: radii.md,
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: colors.bg,
+  },
+  poster: { width: '100%', height: '100%' },
+  headInfo: {
+    flex: 1,
+    gap: 6,
+    paddingBottom: spacing.xs,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    marginTop: 2,
+  },
+  airing: { marginTop: spacing.lg },
+  addBtn: { marginTop: spacing.xl },
+  panel: { marginTop: spacing.xl, gap: spacing.lg },
+  panelStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  panelChevron: { marginLeft: 'auto' },
+  statusDot: { width: 12, height: 12, borderRadius: 6 },
+  stepper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  stepBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: radii.md,
+    backgroundColor: colors.surfaceHigh,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepBtnPrimary: { backgroundColor: colors.accent },
+  stepDisabled: { opacity: 0.4 },
+  stepCount: { alignItems: 'center', gap: 2 },
+  genres: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    marginTop: spacing.xl,
+  },
+  section: { marginTop: spacing['2xl'] },
+  sectionTitle: { marginBottom: spacing.sm },
+  readMore: { marginTop: spacing.sm },
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: spacing.lg,
+    paddingVertical: spacing.md,
+  },
+  infoBorder: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  infoValue: { flex: 1, textAlign: 'right' },
+  backBtn: {
+    position: 'absolute',
+    left: spacing.lg,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(7,7,12,0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+});
