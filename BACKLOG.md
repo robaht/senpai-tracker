@@ -15,16 +15,15 @@ so any one can be picked up cold and started smoothly.
 | ID | Feature | Priority | Effort | Depends on |
 |----|---------|----------|--------|------------|
 | F1 | User accounts & cloud sync | P1 | L | — |
-| F2 | Anime relations / season linking | P2 | M | — |
-| F3 | New-season alerts for watched anime + Upcoming screen | P2 | M–L | F2, Notif. infra, (F1 for true push) |
+| F3 | New-season alerts for watched anime + Upcoming screen | P2 | M–L | Notif. infra, (F1 for true push) |
 | F4 | Seasonal browser (any winter/spring/summer/fall) | P3 | S–M | — |
 | F5 | Recommender ("similar to X" / for you) | P2 | M | — |
 | F6 | Multiple themes (incl. cozy pastel) | P2 | M | Theme refactor |
-| F7 | Deep multi-hop season chain (full S1→S2→S3 ordering) | P3 | M | F2 |
-| F8 | Super Follow (per-title new-season announcement alerts) | P2 | M | F2, Notif. infra, F1 (true push) |
+| F7 | Deep multi-hop season chain (full S1→S2→S3 ordering) | P3 | M | — (extends shipped F2) |
+| F8 | Super Follow (per-title new-season announcement alerts) | P2 | M | Notif. infra, F1 (true push) |
 
 **Suggested build order** (fast value first, heavy infra last):
-`F2 → F4 → F5 → F6 → F1 → F3 → F7 → F8`. Quick AniList-data wins (F2/F4/F5) ship value with
+`F4 → F5 → F6 → F1 → F3 → F7 → F8`. Quick AniList-data wins (F4/F5) ship value with
 no new infrastructure; F6 is a self-contained refactor; F1 + F3 are the
 foundational/infra-heavy pair. Reorder freely — entries are independent except
 where "Depends on" says otherwise.
@@ -76,33 +75,6 @@ where "Depends on" says otherwise.
 - Auth: `expo-auth-session` (OAuth) or Supabase JS client. Add an auth context +
   an `app/(auth)/` route group with a login screen; gate sync on auth state.
 - Migration: on first authenticated launch, `replaceAll`/merge local → cloud.
-
----
-
-## F2 — Anime relations / season linking
-
-**Goal:** From any anime, see and jump to its related entries — sequels, prequels,
-side stories — so from S1 you can discover S2, S3, etc.
-
-### Requirements / acceptance criteria
-- [ ] The detail screen shows a "Related" rail of connected anime.
-- [ ] Each related item is labeled by relation type (Sequel, Prequel, Side story,
-      Movie, …) and tapping it opens that anime's detail.
-- [ ] If a clean sequel/prequel chain exists, present it as an ordered
-      "Seasons" list (S1 → S2 → S3).
-- [ ] Items the user already tracks show their status dot (reuse `PosterCard`).
-
-### Technical approach
-- Extend the detail query (`MEDIA_BY_ID_QUERY` in `queries.ts`) with:
-  `relations { edges { relationType node { id title coverImage format
-  seasonYear status } } }`.
-- Add `RelationEdge` / `RelationType` types to `api/anilist/types.ts`
-  (SEQUEL, PREQUEL, SIDE_STORY, PARENT, ALTERNATIVE, SPIN_OFF, …).
-- New component `RelationsRail` (horizontal list of compact poster cards with a
-  relation-type badge); render it in `app/anime/[id].tsx` below the info card.
-- **Nuance to document:** AniList has no "season number" field — relations form a
-  graph. To produce a linear season list, walk PREQUEL/SEQUEL edges from the
-  current node. Keep this as a helper in `lib/`.
 
 ---
 
