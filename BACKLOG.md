@@ -24,16 +24,15 @@ so any one can be picked up cold and started smoothly.
 | F12 | Cast & characters on detail | P2 | M | — |
 | F13 | Where to watch (streaming links) | P2 | S–M | — |
 | F14 | Your stats / "Year in anime" | P3 | M | — |
-| F15 | Library search & sort | P2 | S | — |
 | F16 | Pull-to-refresh + pagination | P2 | M | — |
 | F17 | Backup / export & import (JSON) | P3 | S | — |
 | F18 | Genre / tag browse & filters | P2 | M | — (pairs with F4) |
 | F20 | Import list from MyAnimeList | P2 | M | — (shares F17 import plumbing) |
 
 **Suggested build order** (fast value first, heavy infra last):
-`F15 → F10 → F13 → F12 → F14 → F16 → F17 → F4 → F18 → F5 → F1 → F3 → F7 → F8`.
+`F10 → F13 → F12 → F14 → F16 → F17 → F4 → F18 → F5 → F1 → F3 → F7 → F8`.
 Start with the cheap wins — F10 surfaces data the app *already fetches* (`trailer`
-is in `MEDIA_FIELDS` but never rendered), and F15 is pure local-data UX. Then
+is in `MEDIA_FIELDS` but never rendered). Then
 detail depth (F13/F12), insights (F14), and plumbing (F16/F17). The heavier
 discovery/infra items (F4/F18/F5/F1/F3/F7/F8) come last. Reorder freely — entries
 are independent except where "Depends on" says otherwise.
@@ -343,27 +342,6 @@ stakes for an anime app, currently absent.
   small stat cards + a lightweight bar/donut (hand-rolled with `View`s to avoid a
   charting dep, matching the token system).
 - Reuse `SectionHeader`, `Card`, and `statusColor` for the per-status rows.
-
----
-
-## F15 — Library search & sort
-
-**Goal:** Keep the Library usable as it grows past a couple dozen titles.
-
-### Requirements / acceptance criteria
-- [ ] A search box filters the Library by title (in addition to the existing status chips).
-- [ ] The user can sort by recently-updated (current default), title (A–Z),
-      score, and progress.
-- [ ] Sort/search compose with the active status filter and update instantly.
-- [ ] Empty/no-match states are handled (reuse `EmptyState`).
-
-### Technical approach
-- Local-only, in `app/(tabs)/library.tsx`. Add a `SearchBar` (already exists as
-  `src/components/SearchBar.tsx`) above the chip bar and a small sort control
-  (segmented chips or a sheet).
-- Replace the single `updatedAt` sort with a `useMemo`'d sort keyed by a `sortBy`
-  state; filter by a lowercased title `includes` over `entry.title`.
-- No new data — operates on the in-memory `entries` map from `useTrackingStore`.
 
 ---
 
