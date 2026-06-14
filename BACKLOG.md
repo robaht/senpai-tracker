@@ -20,7 +20,6 @@ so any one can be picked up cold and started smoothly.
 | F5 | Recommender ("similar to X" / for you) | P2 | M | — |
 | F7 | Deep multi-hop season chain (full S1→S2→S3 ordering) | P3 | M | — (extends shipped F2) |
 | F8 | Super Follow (per-title new-season announcement alerts) | P2 | M | Notif. infra, F1 (true push) |
-| F10 | Watch trailer | P2 | S | — |
 | F12 | Cast & characters on detail | P2 | M | — |
 | F13 | Where to watch (streaming links) | P2 | S–M | — |
 | F14 | Your stats / "Year in anime" | P3 | M | — |
@@ -30,10 +29,9 @@ so any one can be picked up cold and started smoothly.
 | F20 | Import list from MyAnimeList | P2 | M | — (shares F17 import plumbing) |
 
 **Suggested build order** (fast value first, heavy infra last):
-`F10 → F13 → F12 → F14 → F16 → F17 → F4 → F18 → F5 → F1 → F3 → F7 → F8`.
-Start with the cheap wins — F10 surfaces data the app *already fetches* (`trailer`
-is in `MEDIA_FIELDS` but never rendered). Then
-detail depth (F13/F12), insights (F14), and plumbing (F16/F17). The heavier
+`F13 → F12 → F14 → F16 → F17 → F4 → F18 → F5 → F1 → F3 → F7 → F8`.
+Start with detail depth (F13/F12), then insights (F14) and plumbing
+(F16/F17). The heavier
 discovery/infra items (F4/F18/F5/F1/F3/F7/F8) come last. Reorder freely — entries
 are independent except where "Depends on" says otherwise.
 
@@ -249,30 +247,6 @@ the same detection plumbing and notification infra.
 - **UI:** a bell/"Super Follow" toggle in `app/anime/[id].tsx` (near the
   Add-to-list action), and a managed list (a section in Library or a dedicated
   screen) reusing `PosterCard`.
-
----
-
-## F10 — Watch trailer
-
-**Goal:** Play a title's trailer from the detail screen.
-
-> **Already fetched, never shown:** `MEDIA_FIELDS` in
-> `src/api/anilist/queries.ts` already requests `trailer { id site thumbnail }`,
-> and it's on the `Media` type — but no screen renders it.
-
-### Requirements / acceptance criteria
-- [ ] When a trailer exists, the detail screen shows a clear "Watch trailer" affordance.
-- [ ] Tapping it plays the trailer (YouTube or Dailymotion per `trailer.site`).
-- [ ] When no trailer exists, nothing is shown (no dead button).
-
-### Technical approach
-- Build the watch URL from `media.trailer` (`youtube` → `https://youtu.be/{id}`,
-  `dailymotion` → `https://dai.ly/{id}`); a thumbnail tile using `trailer.thumbnail`
-  over the banner area in `app/anime/[id].tsx`.
-- Simplest: open externally via `Linking.openURL` (or `expo-web-browser`). Richer:
-  inline playback with a `WebView` / `expo-video` modal — start with the external
-  open, upgrade later.
-- Place a play overlay on the existing parallax banner, or a button in the meta row.
 
 ---
 
