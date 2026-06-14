@@ -21,7 +21,6 @@ so any one can be picked up cold and started smoothly.
 | F7 | Deep multi-hop season chain (full S1→S2→S3 ordering) | P3 | M | — (extends shipped F2) |
 | F8 | Super Follow (per-title new-season announcement alerts) | P2 | M | Notif. infra, F1 (true push) |
 | F12 | Cast & characters on detail | P2 | M | — |
-| F13 | Where to watch (streaming links) | P2 | S–M | — |
 | F14 | Your stats / "Year in anime" | P3 | M | — |
 | F16 | Pull-to-refresh + pagination | P2 | M | — |
 | F17 | Backup / export & import (JSON) | P3 | S | — |
@@ -29,8 +28,8 @@ so any one can be picked up cold and started smoothly.
 | F20 | Import list from MyAnimeList | P2 | M | — (shares F17 import plumbing) |
 
 **Suggested build order** (fast value first, heavy infra last):
-`F13 → F12 → F14 → F16 → F17 → F4 → F18 → F5 → F1 → F3 → F7 → F8`.
-Start with detail depth (F13/F12), then insights (F14) and plumbing
+`F12 → F14 → F16 → F17 → F4 → F18 → F5 → F1 → F3 → F7 → F8`.
+Start with detail depth (F12), then insights (F14) and plumbing
 (F16/F17). The heavier
 discovery/infra items (F4/F18/F5/F1/F3/F7/F8) come last. Reorder freely — entries
 are independent except where "Depends on" says otherwise.
@@ -271,27 +270,6 @@ stakes for an anime app, currently absent.
   rendered in `app/anime/[id].tsx` below the info card.
 - Keep it on the single detail fetch (no extra request); mind payload size by
   capping `perPage`.
-
----
-
-## F13 — Where to watch (streaming links)
-
-**Goal:** Tell users where a title legally streams (Crunchyroll, Netflix, etc.).
-
-### Requirements / acceptance criteria
-- [ ] The detail screen lists streaming platforms for the title when available.
-- [ ] Each platform opens its page/site in the browser.
-- [ ] Non-streaming/info links are excluded or clearly separated; nothing shown when
-      there are no links.
-
-### Technical approach
-- Add `externalLinks { id site url type color icon }` to `MEDIA_BY_ID_QUERY`
-  (`src/api/anilist/queries.ts`); filter to `type === "STREAMING"`.
-- Extend the detail `Media` type (`src/api/anilist/types.ts`) and pass through in
-  `getAnimeById` (`src/api/anilist/index.ts`).
-- New `StreamingLinks` section in `app/anime/[id].tsx` — a wrap of chips
-  (reuse `Badge`/`Card`) using each link's `color`/`icon`, opening `url` via
-  `Linking.openURL` / `expo-web-browser`.
 
 ---
 
