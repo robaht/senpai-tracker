@@ -35,7 +35,14 @@ export function LibraryRow({ entry }: { entry: TrackEntry }) {
         <Text variant="subheading" numberOfLines={1}>
           {entry.title}
         </Text>
-        <Badge label={meta.short} color={color} />
+        <View style={styles.metaLine}>
+          <Badge label={meta.short} color={color} />
+          {entry.score > 0 && (
+            <Text variant="caption" color={colors.warning}>
+              ★ {entry.score}
+            </Text>
+          )}
+        </View>
 
         <View style={styles.progressRow}>
           <View style={[styles.track, { backgroundColor: colors.surfaceHigh }]}>
@@ -85,6 +92,11 @@ const styles = StyleSheet.create({
   body: {
     flex: 1,
     gap: 6,
+  },
+  metaLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
   },
   progressRow: {
     flexDirection: 'row',

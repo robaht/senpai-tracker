@@ -27,6 +27,7 @@ import { CountdownPill } from '../../src/components/CountdownPill';
 import { AddToListSheet } from '../../src/components/AddToListSheet';
 import { EmptyState } from '../../src/components/EmptyState';
 import { RelationsRail } from '../../src/components/RelationsRail';
+import { RatingStars } from '../../src/components/RatingStars';
 import { useAnime } from '../../src/api/anilist/hooks';
 import { displayTitle } from '../../src/api/anilist';
 import { useTrackEntry, useTrackingStore } from '../../src/features/tracking/store';
@@ -279,6 +280,7 @@ function TrackingPanel({
   const entry = useTrackEntry(mediaId);
   const increment = useTrackingStore((s) => s.incrementProgress);
   const setProgress = useTrackingStore((s) => s.setProgress);
+  const setScore = useTrackingStore((s) => s.setScore);
   if (!entry) return null;
   const meta = STATUS_META[entry.status];
   const atMax = entry.totalEpisodes != null && entry.progress >= entry.totalEpisodes;
@@ -315,6 +317,9 @@ function TrackingPanel({
           <Ionicons name="add" size={20} color={colors.onAccent} />
         </Pressable>
       </View>
+
+      <View style={styles.panelDivider} />
+      <RatingStars value={entry.score} onChange={(v) => setScore(mediaId, v)} />
     </Card>
   );
 }
@@ -387,6 +392,10 @@ const useStyles = makeStyles(({ colors }) => ({
   airing: { marginTop: spacing.lg },
   addBtn: { marginTop: spacing.xl },
   panel: { marginTop: spacing.xl, gap: spacing.lg },
+  panelDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: colors.border,
+  },
   panelStatus: {
     flexDirection: 'row',
     alignItems: 'center',
