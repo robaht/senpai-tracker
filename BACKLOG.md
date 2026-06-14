@@ -20,7 +20,6 @@ so any one can be picked up cold and started smoothly.
 | F5 | Recommender ("similar to X" / for you) | P2 | M | — |
 | F7 | Deep multi-hop season chain (full S1→S2→S3 ordering) | P3 | M | — (extends shipped F2) |
 | F8 | Super Follow (per-title new-season announcement alerts) | P2 | M | Notif. infra, F1 (true push) |
-| F9 | Rate your shows (user score UI) | P1 | S | — |
 | F10 | Watch trailer | P2 | S | — |
 | F11 | "Continue Watching" rail | P1 | S–M | — |
 | F12 | Cast & characters on detail | P2 | M | — |
@@ -32,10 +31,9 @@ so any one can be picked up cold and started smoothly.
 | F18 | Genre / tag browse & filters | P2 | M | — (pairs with F4) |
 
 **Suggested build order** (fast value first, heavy infra last):
-`F9 → F11 → F15 → F10 → F13 → F12 → F14 → F16 → F17 → F4 → F18 → F5 → F1 → F3 → F7 → F8`.
-Start with the **free wins** — F9 and F10 surface data the app *already fetches*
-(`TrackEntry.score` + `store.setScore` exist with no UI; `trailer` is in
-`MEDIA_FIELDS` but never rendered), and F11/F15 are pure local-data UX. Then
+`F11 → F15 → F10 → F13 → F12 → F14 → F16 → F17 → F4 → F18 → F5 → F1 → F3 → F7 → F8`.
+Start with the cheap wins — F10 surfaces data the app *already fetches* (`trailer`
+is in `MEDIA_FIELDS` but never rendered), and F11/F15 are pure local-data UX. Then
 detail depth (F13/F12), insights (F14), and plumbing (F16/F17). The heavier
 discovery/infra items (F4/F18/F5/F1/F3/F7/F8) come last. Reorder freely — entries
 are independent except where "Depends on" says otherwise.
@@ -252,35 +250,6 @@ the same detection plumbing and notification infra.
 - **UI:** a bell/"Super Follow" toggle in `app/anime/[id].tsx` (near the
   Add-to-list action), and a managed list (a section in Library or a dedicated
   screen) reusing `PosterCard`.
-
----
-
-## F9 — Rate your shows (user score UI)
-
-**Goal:** Let users give a title their own 0–10 score and see it on the list.
-
-> **Half-wired today:** the data model and store action already exist —
-> `TrackEntry.score` (`src/features/tracking/types.ts`) and
-> `setScore(mediaId, score)` (`src/features/tracking/store.ts:104`, already
-> clamps 0–10). Nothing in the UI ever calls it, so the field is permanently 0.
-> This feature is almost entirely UI.
-
-### Requirements / acceptance criteria
-- [ ] From an anime that's on the list, the user can set a personal score (0–10).
-- [ ] The score is shown on the detail screen and in the Library row.
-- [ ] The score persists across relaunch and clears cleanly (0 = unscored, hidden).
-- [ ] Changing the score is one obvious gesture (no buried menu).
-
-### Technical approach
-- Add a rating control to the `TrackingPanel` in `app/anime/[id].tsx` (it already
-  hosts the status row + episode stepper) — e.g. a tappable 10-point / 5-star row
-  calling `useTrackingStore((s) => s.setScore)`. Reuse the `statusColor`/accent
-  palette for fill.
-- Surface the value in `src/components/LibraryRow.tsx` (a small `★ 8` next to the
-  progress) and near the score line on the detail header in `app/anime/[id].tsx`.
-- Reuse `formatScore`/the `ScoreBadge` component for consistent rendering; treat
-  `score === 0` as unscored everywhere.
-- No new persistence work — `setScore` already routes through the repository.
 
 ---
 
