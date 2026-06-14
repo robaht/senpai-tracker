@@ -21,7 +21,6 @@ so any one can be picked up cold and started smoothly.
 | F7 | Deep multi-hop season chain (full S1→S2→S3 ordering) | P3 | M | — (extends shipped F2) |
 | F8 | Super Follow (per-title new-season announcement alerts) | P2 | M | Notif. infra, F1 (true push) |
 | F10 | Watch trailer | P2 | S | — |
-| F11 | "Continue Watching" rail | P1 | S–M | — |
 | F12 | Cast & characters on detail | P2 | M | — |
 | F13 | Where to watch (streaming links) | P2 | S–M | — |
 | F14 | Your stats / "Year in anime" | P3 | M | — |
@@ -32,9 +31,9 @@ so any one can be picked up cold and started smoothly.
 | F20 | Import list from MyAnimeList | P2 | M | — (shares F17 import plumbing) |
 
 **Suggested build order** (fast value first, heavy infra last):
-`F11 → F15 → F10 → F13 → F12 → F14 → F16 → F17 → F4 → F18 → F5 → F1 → F3 → F7 → F8`.
+`F15 → F10 → F13 → F12 → F14 → F16 → F17 → F4 → F18 → F5 → F1 → F3 → F7 → F8`.
 Start with the cheap wins — F10 surfaces data the app *already fetches* (`trailer`
-is in `MEDIA_FIELDS` but never rendered), and F11/F15 are pure local-data UX. Then
+is in `MEDIA_FIELDS` but never rendered), and F15 is pure local-data UX. Then
 detail depth (F13/F12), insights (F14), and plumbing (F16/F17). The heavier
 discovery/infra items (F4/F18/F5/F1/F3/F7/F8) come last. Reorder freely — entries
 are independent except where "Depends on" says otherwise.
@@ -275,34 +274,6 @@ the same detection plumbing and notification infra.
   inline playback with a `WebView` / `expo-video` modal — start with the external
   open, upgrade later.
 - Place a play overlay on the existing parallax banner, or a button in the meta row.
-
----
-
-## F11 — "Continue Watching" rail
-
-**Goal:** Resurface in-progress shows for one-tap episode logging — turn the app
-from a catalog into a daily habit.
-
-### Requirements / acceptance criteria
-- [ ] A "Continue watching" rail lists `CURRENT` (and optionally `REPEATING`)
-      entries, most-recently-updated first.
-- [ ] Each card shows progress ("Ep 5 / 12") and a one-tap **+1 episode** control
-      that updates without leaving the screen.
-- [ ] Tapping the card opens the detail; the rail hides when there's nothing in progress.
-- [ ] An entry that reaches its last episode is handled gracefully (e.g. nudge to
-      mark Completed) — no negative/over-max counts.
-
-### Technical approach
-- Pure local data — read `useTrackingStore`, filter `status === 'CURRENT'`, sort by
-  `updatedAt`. No network.
-- New `ContinueWatchingRail` component (horizontal `FlatList`) placed at the top of
-  Library (`app/(tabs)/library.tsx`) and/or above Trending on Discover
-  (`app/(tabs)/index.tsx`).
-- The +1 action calls the existing `incrementProgress(mediaId)` from the store
-  (already clamps to `totalEpisodes`); reuse the stepper visual language from the
-  detail `TrackingPanel`.
-- Cards render from the denormalized `TrackEntry` snapshot (title/cover), so the
-  rail works offline with zero fetches.
 
 ---
 
