@@ -4,6 +4,7 @@ import { Screen } from '../../src/components/ui/Screen';
 import { Text } from '../../src/components/ui/Text';
 import { withAlpha } from '../../src/components/ui/Badge';
 import { LibraryRow } from '../../src/components/LibraryRow';
+import { ContinueWatchingRail } from '../../src/components/ContinueWatchingRail';
 import { EmptyState } from '../../src/components/EmptyState';
 import { useTrackingStore } from '../../src/features/tracking/store';
 import {
@@ -77,6 +78,7 @@ export default function LibraryScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
         renderItem={({ item }) => <LibraryRow entry={item} />}
+        ListHeaderComponent={filter === 'ALL' ? <ContinueWatchingRail /> : null}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         ListEmptyComponent={
           hydrated ? (
