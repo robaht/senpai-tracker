@@ -71,6 +71,28 @@ export interface MediaTrailer {
   thumbnail: string | null;
 }
 
+/**
+ * A streaming/where-to-watch link from AniList's `externalLinks`. Only STREAMING
+ * links survive into the app (getAnimeById drops INFO/SOCIAL + disabled ones).
+ * `language` is AniList's per-link region signal (e.g. "German", "English") and
+ * is what lib/streaming.ts uses to decide regional relevance — it's the closest
+ * thing AniList exposes to per-country availability (there is no catalog field).
+ */
+export interface ExternalLink {
+  id: number;
+  url: string;
+  /** Service name, e.g. "Crunchyroll", "Netflix", "Bilibili TV". */
+  site: string;
+  /** Full English language name, or null when the link isn't region-tagged. */
+  language: string | null;
+  /** Brand hex like "#F47521", or null. */
+  color: string | null;
+  /** URL to a small service icon, or null. */
+  icon: string | null;
+  /** Free-text note AniList sometimes attaches, e.g. "Dub". */
+  notes: string | null;
+}
+
 /** A single anime entry as returned by AniList. */
 export interface Media {
   id: number;
@@ -97,6 +119,12 @@ export interface Media {
    * getAnimeById. Absent elsewhere (and on relation nodes, to avoid recursion).
    */
   relations?: MediaRelationEdge[];
+  /**
+   * Where-to-watch links. Only populated on the detail query; filtered to
+   * STREAMING (non-disabled) by getAnimeById. Region handling lives in
+   * lib/streaming.ts.
+   */
+  externalLinks?: ExternalLink[];
 }
 
 /** A single relation: how `node` connects to the anime it was fetched from. */

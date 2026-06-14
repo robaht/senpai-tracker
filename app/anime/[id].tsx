@@ -28,6 +28,7 @@ import { AddToListSheet } from '../../src/components/AddToListSheet';
 import { EmptyState } from '../../src/components/EmptyState';
 import { RelationsRail } from '../../src/components/RelationsRail';
 import { TrailerCard } from '../../src/components/TrailerCard';
+import { StreamingLinks } from '../../src/components/StreamingLinks';
 import { RatingStars } from '../../src/components/RatingStars';
 import { useAnime } from '../../src/api/anilist/hooks';
 import { displayTitle } from '../../src/api/anilist';
@@ -187,6 +188,9 @@ export default function AnimeDetailScreen() {
 
             {/* Trailer (renders nothing when there's no playable trailer) */}
             <TrailerCard trailer={media.trailer} />
+
+            {/* Where to watch — region-aware streaming links */}
+            <StreamingLinks links={media.externalLinks} />
 
             {/* Synopsis */}
             {media.description && (

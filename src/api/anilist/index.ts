@@ -9,6 +9,7 @@ import {
 } from './queries';
 import type {
   AiringScheduleItem,
+  ExternalLink,
   Media,
   MediaRelationEdge,
   MediaSeason,
@@ -58,15 +59,23 @@ export async function searchAnime(search: string, page = 1, perPage = 20): Promi
   return toPage(data.Page.pageInfo, data.Page.media);
 }
 
-/** AniList nests relations as `{ edges: [...] }`; we expose a flat array on Media. */
-type RawMediaDetail = Omit<Media, 'relations'> & {
+/**
+ * AniList nests relations as `{ edges: [...] }`; we expose a flat array on Media.
+ * externalLinks arrives flat but carries INFO/SOCIAL + disabled entries we drop.
+ */
+type RawExternalLink = ExternalLink & { type: string | null; isDisabled: boolean | null };
+type RawMediaDetail = Omit<Media, 'relations' | 'externalLinks'> & {
   relations?: { edges: MediaRelationEdge[] };
+  externalLinks?: RawExternalLink[];
 };
 
 export async function getAnimeById(id: number): Promise<Media> {
   const data = await anilistRequest<{ Media: RawMediaDetail }>(MEDIA_BY_ID_QUERY, { id });
-  const { relations, ...media } = data.Media;
-  return { ...media, relations: relations?.edges ?? [] };
+  const { relations, externalLinks, ...media } = data.Media;
+  const streaming = (externalLinks ?? [])
+    .filter((l) => l.type === 'STREAMING' && !l.isDisabled)
+    .map(({ type, isDisabled, ...link }) => link);
+  return { ...media, relations: relations?.edges ?? [], externalLinks: streaming };
 }
 
 export async function getAiringSchedule(

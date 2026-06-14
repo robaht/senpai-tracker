@@ -125,6 +125,17 @@ export const MEDIA_BY_ID_QUERY = gql`
           }
         }
       }
+      externalLinks {
+        id
+        url
+        site
+        type
+        language
+        color
+        icon
+        notes
+        isDisabled
+      }
     }
   }
 `;

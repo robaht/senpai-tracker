@@ -15,7 +15,8 @@ import { Screen } from '../src/components/ui/Screen';
 import { Text } from '../src/components/ui/Text';
 import { Badge, withAlpha } from '../src/components/ui/Badge';
 import { PressableScale } from '../src/components/ui/PressableScale';
-import { usePreferencesStore } from '../src/features/preferences/store';
+import { usePreferencesStore, useRegion } from '../src/features/preferences/store';
+import { REGION_OPTIONS, regionLabel } from '../src/lib/streaming';
 import {
   THEME_LIST,
   radii,
@@ -42,6 +43,10 @@ export default function SettingsScreen() {
   const setManualTheme = usePreferencesStore((s) => s.setManualTheme);
   const setLightTheme = usePreferencesStore((s) => s.setLightTheme);
   const setDarkTheme = usePreferencesStore((s) => s.setDarkTheme);
+
+  const region = usePreferencesStore((s) => s.region);
+  const setRegion = usePreferencesStore((s) => s.setRegion);
+  const resolvedRegion = useRegion();
 
   const following = mode === 'system';
   const systemIsDark = scheme !== 'light'; // treat null as dark
@@ -147,8 +152,45 @@ export default function SettingsScreen() {
           </>
         )}
 
+        <Text variant="overline" color="textFaint" style={styles.sectionLabel}>
+          STREAMING REGION
+        </Text>
+        <Text variant="caption" color="textFaint" style={styles.regionHint}>
+          {region === null
+            ? resolvedRegion
+              ? `Following this device — ${regionLabel(resolvedRegion).flag} ${regionLabel(resolvedRegion).label}. Tailors "Where to watch" links.`
+              : 'Tailors "Where to watch" links to your country.'
+            : 'Tailors "Where to watch" links to the region you picked.'}
+        </Text>
+        <View style={styles.regionWrap}>
+          {REGION_OPTIONS.map((opt) => {
+            const selected = (region ?? '') === opt.code;
+            return (
+              <Pressable
+                key={opt.code || 'auto'}
+                onPress={() => setRegion(opt.code === '' ? null : opt.code)}
+                style={[
+                  styles.regionChip,
+                  {
+                    backgroundColor: selected ? withAlpha(colors.accent, 0.16) : colors.surface,
+                    borderColor: selected ? colors.accent : colors.border,
+                  },
+                ]}
+                accessibilityRole="button"
+                accessibilityState={{ selected }}
+                accessibilityLabel={opt.label}
+              >
+                <Text variant="callout">{opt.flag}</Text>
+                <Text variant="callout" color={selected ? colors.accent : undefined}>
+                  {opt.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
         <Text variant="caption" color="textFaint" style={styles.footnote}>
-          Themes apply instantly and are saved on this device.
+          Themes and region apply instantly and are saved on this device.
         </Text>
       </ScrollView>
     </Screen>
@@ -404,5 +446,22 @@ const styles = StyleSheet.create({
   footnote: {
     marginTop: spacing.xl,
     textAlign: 'center',
+  },
+  regionHint: {
+    marginBottom: spacing.md,
+  },
+  regionWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  regionChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs + 2,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: radii.pill,
+    borderWidth: StyleSheet.hairlineWidth,
   },
 });

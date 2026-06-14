@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { getLocales } from 'expo-localization';
 import { themes, type ThemeName } from '../../theme/tokens';
 import { preferencesRepository } from './repository';
 import { DEFAULT_PREFERENCES, type Preferences, type ThemeMode } from './types';
@@ -15,13 +16,18 @@ interface PreferencesState extends Preferences {
   /** Pick the theme used when following the system in light / dark. */
   setLightTheme: (name: ThemeName) => void;
   setDarkTheme: (name: ThemeName) => void;
+  /** Set the streaming region, or `null` to follow the device locale. */
+  setRegion: (region: string | null) => void;
 }
+
+/** Device region from the OS locale, resolved once (used when region is `null`). */
+const DEVICE_REGION = getLocales()[0]?.regionCode ?? null;
 
 export const usePreferencesStore = create<PreferencesState>((set, get) => {
   // Fire-and-forget persistence; in-memory state drives rendering.
   const persist = () => {
-    const { mode, manualTheme, lightTheme, darkTheme } = get();
-    void preferencesRepository.save({ mode, manualTheme, lightTheme, darkTheme });
+    const { mode, manualTheme, lightTheme, darkTheme, region } = get();
+    void preferencesRepository.save({ mode, manualTheme, lightTheme, darkTheme, region });
   };
 
   return {
@@ -55,5 +61,20 @@ export const usePreferencesStore = create<PreferencesState>((set, get) => {
       set({ darkTheme: name });
       persist();
     },
+
+    setRegion: (region) => {
+      set({ region });
+      persist();
+    },
   };
 });
+
+/**
+ * The effective streaming region: the user's explicit choice, or the device
+ * locale's region when set to "auto" (`null`). May be `null` if the OS exposes
+ * no region — callers should treat that as "no regional filtering".
+ */
+export function useRegion(): string | null {
+  const region = usePreferencesStore((s) => s.region);
+  return region ?? DEVICE_REGION;
+}

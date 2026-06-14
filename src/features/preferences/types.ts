@@ -16,6 +16,11 @@ export interface Preferences {
   lightTheme: ThemeName;
   /** Theme used in `system` mode when the OS is in dark mode. */
   darkTheme: ThemeName;
+  /**
+   * 2-letter country code used to tailor "where to watch" streaming links.
+   * `null` means follow the device locale (the default).
+   */
+  region: string | null;
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
@@ -23,4 +28,5 @@ export const DEFAULT_PREFERENCES: Preferences = {
   manualTheme: 'midnight',
   lightTheme: 'cozy',
   darkTheme: 'midnight',
+  region: null,
 };
