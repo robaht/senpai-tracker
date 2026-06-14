@@ -20,11 +20,25 @@ so any one can be picked up cold and started smoothly.
 | F5 | Recommender ("similar to X" / for you) | P2 | M | — |
 | F7 | Deep multi-hop season chain (full S1→S2→S3 ordering) | P3 | M | — (extends shipped F2) |
 | F8 | Super Follow (per-title new-season announcement alerts) | P2 | M | Notif. infra, F1 (true push) |
+| F9 | Rate your shows (user score UI) | P1 | S | — |
+| F10 | Watch trailer | P2 | S | — |
+| F11 | "Continue Watching" rail | P1 | S–M | — |
+| F12 | Cast & characters on detail | P2 | M | — |
+| F13 | Where to watch (streaming links) | P2 | S–M | — |
+| F14 | Your stats / "Year in anime" | P3 | M | — |
+| F15 | Library search & sort | P2 | S | — |
+| F16 | Pull-to-refresh + pagination | P2 | M | — |
+| F17 | Backup / export & import (JSON) | P3 | S | — |
+| F18 | Genre / tag browse & filters | P2 | M | — (pairs with F4) |
 
 **Suggested build order** (fast value first, heavy infra last):
-`F4 → F5 → F1 → F3 → F7 → F8`. Quick AniList-data wins (F4/F5) ship value with
-no new infrastructure; F1 + F3 are the foundational/infra-heavy pair. Reorder freely — entries are independent except
-where "Depends on" says otherwise.
+`F9 → F11 → F15 → F10 → F13 → F12 → F14 → F16 → F17 → F4 → F18 → F5 → F1 → F3 → F7 → F8`.
+Start with the **free wins** — F9 and F10 surface data the app *already fetches*
+(`TrackEntry.score` + `store.setScore` exist with no UI; `trailer` is in
+`MEDIA_FIELDS` but never rendered), and F11/F15 are pure local-data UX. Then
+detail depth (F13/F12), insights (F14), and plumbing (F16/F17). The heavier
+discovery/infra items (F4/F18/F5/F1/F3/F7/F8) come last. Reorder freely — entries
+are independent except where "Depends on" says otherwise.
 
 ### Shared prerequisites (cross-cutting)
 - **Notifications infrastructure** (needed by F3): `expo-notifications` setup +
@@ -238,3 +252,250 @@ the same detection plumbing and notification infra.
 - **UI:** a bell/"Super Follow" toggle in `app/anime/[id].tsx` (near the
   Add-to-list action), and a managed list (a section in Library or a dedicated
   screen) reusing `PosterCard`.
+
+---
+
+## F9 — Rate your shows (user score UI)
+
+**Goal:** Let users give a title their own 0–10 score and see it on the list.
+
+> **Half-wired today:** the data model and store action already exist —
+> `TrackEntry.score` (`src/features/tracking/types.ts`) and
+> `setScore(mediaId, score)` (`src/features/tracking/store.ts:104`, already
+> clamps 0–10). Nothing in the UI ever calls it, so the field is permanently 0.
+> This feature is almost entirely UI.
+
+### Requirements / acceptance criteria
+- [ ] From an anime that's on the list, the user can set a personal score (0–10).
+- [ ] The score is shown on the detail screen and in the Library row.
+- [ ] The score persists across relaunch and clears cleanly (0 = unscored, hidden).
+- [ ] Changing the score is one obvious gesture (no buried menu).
+
+### Technical approach
+- Add a rating control to the `TrackingPanel` in `app/anime/[id].tsx` (it already
+  hosts the status row + episode stepper) — e.g. a tappable 10-point / 5-star row
+  calling `useTrackingStore((s) => s.setScore)`. Reuse the `statusColor`/accent
+  palette for fill.
+- Surface the value in `src/components/LibraryRow.tsx` (a small `★ 8` next to the
+  progress) and near the score line on the detail header in `app/anime/[id].tsx`.
+- Reuse `formatScore`/the `ScoreBadge` component for consistent rendering; treat
+  `score === 0` as unscored everywhere.
+- No new persistence work — `setScore` already routes through the repository.
+
+---
+
+## F10 — Watch trailer
+
+**Goal:** Play a title's trailer from the detail screen.
+
+> **Already fetched, never shown:** `MEDIA_FIELDS` in
+> `src/api/anilist/queries.ts` already requests `trailer { id site thumbnail }`,
+> and it's on the `Media` type — but no screen renders it.
+
+### Requirements / acceptance criteria
+- [ ] When a trailer exists, the detail screen shows a clear "Watch trailer" affordance.
+- [ ] Tapping it plays the trailer (YouTube or Dailymotion per `trailer.site`).
+- [ ] When no trailer exists, nothing is shown (no dead button).
+
+### Technical approach
+- Build the watch URL from `media.trailer` (`youtube` → `https://youtu.be/{id}`,
+  `dailymotion` → `https://dai.ly/{id}`); a thumbnail tile using `trailer.thumbnail`
+  over the banner area in `app/anime/[id].tsx`.
+- Simplest: open externally via `Linking.openURL` (or `expo-web-browser`). Richer:
+  inline playback with a `WebView` / `expo-video` modal — start with the external
+  open, upgrade later.
+- Place a play overlay on the existing parallax banner, or a button in the meta row.
+
+---
+
+## F11 — "Continue Watching" rail
+
+**Goal:** Resurface in-progress shows for one-tap episode logging — turn the app
+from a catalog into a daily habit.
+
+### Requirements / acceptance criteria
+- [ ] A "Continue watching" rail lists `CURRENT` (and optionally `REPEATING`)
+      entries, most-recently-updated first.
+- [ ] Each card shows progress ("Ep 5 / 12") and a one-tap **+1 episode** control
+      that updates without leaving the screen.
+- [ ] Tapping the card opens the detail; the rail hides when there's nothing in progress.
+- [ ] An entry that reaches its last episode is handled gracefully (e.g. nudge to
+      mark Completed) — no negative/over-max counts.
+
+### Technical approach
+- Pure local data — read `useTrackingStore`, filter `status === 'CURRENT'`, sort by
+  `updatedAt`. No network.
+- New `ContinueWatchingRail` component (horizontal `FlatList`) placed at the top of
+  Library (`app/(tabs)/library.tsx`) and/or above Trending on Discover
+  (`app/(tabs)/index.tsx`).
+- The +1 action calls the existing `incrementProgress(mediaId)` from the store
+  (already clamps to `totalEpisodes`); reuse the stepper visual language from the
+  detail `TrackingPanel`.
+- Cards render from the denormalized `TrackEntry` snapshot (title/cover), so the
+  rail works offline with zero fetches.
+
+---
+
+## F12 — Cast & characters on detail
+
+**Goal:** Show the main characters (and their voice actors) on a title — table
+stakes for an anime app, currently absent.
+
+### Requirements / acceptance criteria
+- [ ] The detail screen shows a horizontal rail of main characters with portrait + name.
+- [ ] Each character optionally shows its (Japanese) voice actor.
+- [ ] The rail is capped to a sensible number (e.g. top ~10 by role) with graceful
+      empty/partial handling.
+
+### Technical approach
+- Extend `MEDIA_BY_ID_QUERY` (`src/api/anilist/queries.ts`) with
+  `characters(sort: ROLE, perPage: 12) { edges { role node { id name { full } image { large } } voiceActors(language: JAPANESE) { id name { full } image { large } } } }`.
+- Add the shape to the `Media` detail type in `src/api/anilist/types.ts` and map it
+  in `getAnimeById` (`src/api/anilist/index.ts`), mirroring how `relations.edges`
+  is flattened today.
+- New `CharacterRail` component (reuse the rail pattern from `RelationsRail`),
+  rendered in `app/anime/[id].tsx` below the info card.
+- Keep it on the single detail fetch (no extra request); mind payload size by
+  capping `perPage`.
+
+---
+
+## F13 — Where to watch (streaming links)
+
+**Goal:** Tell users where a title legally streams (Crunchyroll, Netflix, etc.).
+
+### Requirements / acceptance criteria
+- [ ] The detail screen lists streaming platforms for the title when available.
+- [ ] Each platform opens its page/site in the browser.
+- [ ] Non-streaming/info links are excluded or clearly separated; nothing shown when
+      there are no links.
+
+### Technical approach
+- Add `externalLinks { id site url type color icon }` to `MEDIA_BY_ID_QUERY`
+  (`src/api/anilist/queries.ts`); filter to `type === "STREAMING"`.
+- Extend the detail `Media` type (`src/api/anilist/types.ts`) and pass through in
+  `getAnimeById` (`src/api/anilist/index.ts`).
+- New `StreamingLinks` section in `app/anime/[id].tsx` — a wrap of chips
+  (reuse `Badge`/`Card`) using each link's `color`/`icon`, opening `url` via
+  `Linking.openURL` / `expo-web-browser`.
+
+---
+
+## F14 — Your stats / "Year in anime"
+
+**Goal:** Turn the library into insights — a stats view users want to revisit and share.
+
+### Requirements / acceptance criteria
+- [ ] A stats view shows totals: titles tracked, episodes watched, estimated hours,
+      and counts per status.
+- [ ] A genre/format breakdown of the user's list (top genres by frequency).
+- [ ] Score insights: mean user score and a simple score distribution.
+- [ ] All computed from the local list; works offline.
+
+### Technical approach
+- 100% local — derive from `useTrackingStore` entries. Hours ≈ `Σ progress ×
+  duration`; the `TrackEntry` snapshot lacks `duration`/`genres`, so either (a)
+  extend the snapshot to store them on `track()` (`src/features/tracking/store.ts`
+  `snapshotFromMedia`) going forward, or (b) hydrate from the TanStack Query detail
+  cache where present. Document the approximation.
+- New screen `app/stats.tsx` (push from Library header or Settings), built from
+  small stat cards + a lightweight bar/donut (hand-rolled with `View`s to avoid a
+  charting dep, matching the token system).
+- Reuse `SectionHeader`, `Card`, and `statusColor` for the per-status rows.
+
+---
+
+## F15 — Library search & sort
+
+**Goal:** Keep the Library usable as it grows past a couple dozen titles.
+
+### Requirements / acceptance criteria
+- [ ] A search box filters the Library by title (in addition to the existing status chips).
+- [ ] The user can sort by recently-updated (current default), title (A–Z),
+      score, and progress.
+- [ ] Sort/search compose with the active status filter and update instantly.
+- [ ] Empty/no-match states are handled (reuse `EmptyState`).
+
+### Technical approach
+- Local-only, in `app/(tabs)/library.tsx`. Add a `SearchBar` (already exists as
+  `src/components/SearchBar.tsx`) above the chip bar and a small sort control
+  (segmented chips or a sheet).
+- Replace the single `updatedAt` sort with a `useMemo`'d sort keyed by a `sortBy`
+  state; filter by a lowercased title `includes` over `entry.title`.
+- No new data — operates on the in-memory `entries` map from `useTrackingStore`.
+
+---
+
+## F16 — Pull-to-refresh + pagination
+
+**Goal:** Let users refresh and scroll past the first page on Discover, Search,
+and Schedule (today they're capped at one page).
+
+### Requirements / acceptance criteria
+- [ ] Pull-to-refresh on Discover, Search, and Schedule re-fetches the first page.
+- [ ] Scrolling to the end of a grid/list loads the next page (infinite scroll),
+      with a footer spinner and a clean "end reached" state.
+- [ ] Loading more never duplicates items and respects AniList's ~90 req/min limit.
+
+### Technical approach
+- Swap the affected `useQuery` hooks (`useTrending`, `useSeasonal`,
+  `useSearchAnime`, `useAiringSchedule` in `src/api/anilist/hooks.ts`) to
+  `useInfiniteQuery`, using the existing `pageInfo.hasNextPage`/`currentPage` from
+  the API fns in `src/api/anilist/index.ts` as the cursor.
+- Wire `onEndReached` + `refreshControl` on the `FlatList`s in
+  `app/(tabs)/index.tsx` and `app/(tabs)/schedule.tsx`; flatten `data.pages` for
+  `renderItem`.
+- Keep `perPage` modest and rely on TanStack Query dedup/cache to stay under the
+  rate limit.
+- Also paginate `useTrackedAiringSchedule` (Schedule "My list"): it's id-filtered
+  so it rarely overflows, but a power user tracking 50+ currently-airing titles
+  would hit the same single-page (`perPage: 50`) cap.
+
+---
+
+## F17 — Backup / export & import (JSON)
+
+**Goal:** Protect the local-only list from loss (uninstall, device change) before
+cloud sync (F1) lands — and provide a migration on-ramp for it.
+
+### Requirements / acceptance criteria
+- [ ] The user can export their entire watch list to a JSON file (share sheet / save).
+- [ ] The user can import a previously exported file, merging into (or replacing)
+      the current list without corrupting existing entries.
+- [ ] Export round-trips losslessly: import-of-export yields the same list.
+- [ ] Clear feedback on success/failure and on how conflicts are resolved.
+
+### Technical approach
+- Export: serialize `trackingRepository.getAll()` (the same `TrackEntry[]` behind
+  the `senpai:tracking:v1` key) to JSON; write + share via `expo-file-system` +
+  `expo-sharing`.
+- Import: `expo-document-picker` → parse/validate → merge by `mediaId` using the
+  existing `updatedAt` field (last-write-wins, the same rule F1 will use). Add a
+  `replaceAll`/merge path on the repository (`src/features/tracking/repository.ts`)
+  and refresh the store via `hydrate()`.
+- Entry point: a row in `app/settings.tsx`. This deliberately prototypes F1's
+  merge/conflict logic on a smaller surface.
+
+---
+
+## F18 — Genre / tag browse & filters
+
+**Goal:** Discovery beyond free-text search — browse by genre/tag with sorting.
+
+### Requirements / acceptance criteria
+- [ ] The user can browse anime filtered by one or more genres (and optionally tags).
+- [ ] Results can be sorted (e.g. Popularity, Score, Trending).
+- [ ] Filters compose with the seasonal browser (F4) where it makes sense
+      (genre + season + year).
+- [ ] Clear active-filter display and a one-tap reset.
+
+### Technical approach
+- AniList's `Page.media` already supports `genre_in`, `tag_in`, and `sort` — add a
+  `BROWSE_QUERY` (or generalize `SEARCH_QUERY`) in `src/api/anilist/queries.ts`
+  plus a `browse(filters, page)` fn in `src/api/anilist/index.ts` and a
+  `useBrowse(filters)` hook in `src/api/anilist/hooks.ts` (genre list itself comes
+  from AniList's `GenreCollection`, fetched once + cached).
+- New screen `app/browse.tsx` (or fold into F4's seasons screen): a genre chip
+  multi-select + sort control, rendering the existing `PosterCard` grid.
+- Builds naturally on F16's infinite-scroll once that lands; cap fan-out for the
+  rate limit.
