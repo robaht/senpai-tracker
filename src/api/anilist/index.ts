@@ -4,6 +4,7 @@ import {
   MEDIA_BY_ID_QUERY,
   SEARCH_QUERY,
   SEASONAL_QUERY,
+  TRACKED_AIRING_SCHEDULE_QUERY,
   TRENDING_QUERY,
 } from './queries';
 import type {
@@ -77,6 +78,27 @@ export async function getAiringSchedule(
   const data = await anilistRequest<RawPage<{ airingSchedules: AiringScheduleItem[] }>>(
     AIRING_SCHEDULE_QUERY,
     { from, to, page, perPage },
+  );
+  return toPage(data.Page.pageInfo, data.Page.airingSchedules);
+}
+
+/**
+ * Upcoming episodes for a specific set of media ids (the user's tracked list).
+ * Returns an empty page for an empty id list without hitting the network.
+ */
+export async function getTrackedAiringSchedule(
+  ids: number[],
+  from: number,
+  to: number,
+  page = 1,
+  perPage = 50,
+): Promise<Page<AiringScheduleItem>> {
+  if (ids.length === 0) {
+    return toPage({ total: 0, currentPage: 1, lastPage: 1, hasNextPage: false, perPage }, []);
+  }
+  const data = await anilistRequest<RawPage<{ airingSchedules: AiringScheduleItem[] }>>(
+    TRACKED_AIRING_SCHEDULE_QUERY,
+    { ids, from, to, page, perPage },
   );
   return toPage(data.Page.pageInfo, data.Page.airingSchedules);
 }

@@ -4,6 +4,7 @@ import {
   getAiringSchedule,
   getAnimeById,
   getSeasonal,
+  getTrackedAiringSchedule,
   getTrending,
   searchAnime,
 } from './index';
@@ -20,6 +21,8 @@ export const animeKeys = {
   search: (q: string) => [...animeKeys.all, 'search', q] as const,
   detail: (id: number) => [...animeKeys.all, 'detail', id] as const,
   airing: (from: number, to: number) => [...animeKeys.all, 'airing', from, to] as const,
+  trackedAiring: (ids: number[], from: number, to: number) =>
+    [...animeKeys.all, 'airing', 'tracked', ids, from, to] as const,
 };
 
 export function useTrending() {
@@ -62,5 +65,22 @@ export function useAiringSchedule(days = 7) {
   return useQuery({
     queryKey: animeKeys.airing(from - (from % 3600), to - (to % 3600)),
     queryFn: () => getAiringSchedule(from, to, 1, 50),
+  });
+}
+
+/**
+ * Upcoming episodes for the user's tracked titles over the next `days` days.
+ * Queries AniList by id (not by filtering the global feed), so every tracked
+ * show airing in the window is returned regardless of how busy the season is.
+ * A wider default window than `useAiringSchedule` since the result set is small.
+ */
+export function useTrackedAiringSchedule(ids: number[], days = 14) {
+  const sorted = [...ids].sort((a, b) => a - b);
+  const from = Math.floor(Date.now() / 1000);
+  const to = from + days * 24 * 60 * 60;
+  return useQuery({
+    queryKey: animeKeys.trackedAiring(sorted, from - (from % 3600), to - (to % 3600)),
+    queryFn: () => getTrackedAiringSchedule(sorted, from, to, 1, 50),
+    enabled: sorted.length > 0,
   });
 }

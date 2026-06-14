@@ -6,24 +6,37 @@ import { Skeleton } from '../../src/components/ui/Skeleton';
 import { withAlpha } from '../../src/components/ui/Badge';
 import { ScheduleRow } from '../../src/components/ScheduleRow';
 import { EmptyState } from '../../src/components/EmptyState';
-import { useAiringSchedule } from '../../src/api/anilist/hooks';
+import { useAiringSchedule, useTrackedAiringSchedule } from '../../src/api/anilist/hooks';
 import { useTrackingStore } from '../../src/features/tracking/store';
 import { airingDayLabel } from '../../src/lib/format';
 import type { AiringScheduleItem } from '../../src/api/anilist';
 import { spacing, makeStyles, useTheme } from '../../src/theme';
 
 const BOTTOM_SPACE = 110;
+const ALL_WINDOW_DAYS = 7;
+/** "My list" uses a wider window — the result set is just the user's titles. */
+const TRACKED_WINDOW_DAYS = 14;
 
 export default function ScheduleScreen() {
-  const { data, isLoading, isError, refetch } = useAiringSchedule(7);
   const entries = useTrackingStore((s) => s.entries);
   const styles = useStyles();
   const [onlyTracked, setOnlyTracked] = useState(false);
 
-  const sections = useMemo(() => {
-    let items = data?.items ?? [];
-    if (onlyTracked) items = items.filter((i) => !!entries[i.media.id]);
+  const trackedIds = useMemo(() => Object.keys(entries).map(Number), [entries]);
 
+  const all = useAiringSchedule(ALL_WINDOW_DAYS);
+  // Ask AniList for exactly the tracked ids rather than filtering the global feed,
+  // which is capped at one page and truncates before reaching most tracked titles.
+  const tracked = useTrackedAiringSchedule(trackedIds, TRACKED_WINDOW_DAYS);
+
+  const active = onlyTracked ? tracked : all;
+  const windowDays = onlyTracked ? TRACKED_WINDOW_DAYS : ALL_WINDOW_DAYS;
+  const hasTracked = trackedIds.length > 0;
+  // An empty tracked list disables the query (never "loading"); treat as resolved.
+  const isLoading = onlyTracked ? hasTracked && active.isLoading : active.isLoading;
+
+  const sections = useMemo(() => {
+    const items = active.data?.items ?? [];
     const byDay = new Map<string, AiringScheduleItem[]>();
     for (const item of items) {
       const label = airingDayLabel(item.airingAt);
@@ -32,13 +45,13 @@ export default function ScheduleScreen() {
       byDay.set(label, arr);
     }
     return Array.from(byDay.entries()).map(([title, rows]) => ({ title, data: rows }));
-  }, [data, onlyTracked, entries]);
+  }, [active.data]);
 
   return (
     <Screen>
       <View style={styles.headerWrap}>
         <Text variant="overline" color="textFaint">
-          NEXT 7 DAYS
+          NEXT {windowDays} DAYS
         </Text>
         <Text variant="display">Schedule</Text>
 
@@ -50,7 +63,7 @@ export default function ScheduleScreen() {
 
       {isLoading ? (
         <ScheduleSkeleton />
-      ) : isError ? (
+      ) : active.isError ? (
         <EmptyState
           emoji="📡"
           title="Couldn't load the schedule"
@@ -63,7 +76,7 @@ export default function ScheduleScreen() {
           contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}
           stickySectionHeadersEnabled={false}
-          onRefresh={refetch}
+          onRefresh={active.refetch}
           refreshing={false}
           renderSectionHeader={({ section }) => (
             <Text variant="callout" color="accentSoft" style={styles.sectionHeader}>
@@ -73,19 +86,48 @@ export default function ScheduleScreen() {
           renderItem={({ item }) => <ScheduleRow item={item} />}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
           ListEmptyComponent={
-            <EmptyState
-              emoji={onlyTracked ? '🌙' : '✶'}
-              title={onlyTracked ? 'Nothing from your list airs soon' : 'No episodes scheduled'}
-              subtitle={
-                onlyTracked
-                  ? 'Add airing shows to your list to see their countdowns here.'
-                  : 'Check back later for upcoming episodes.'
-              }
-            />
+            <ScheduleEmpty onlyTracked={onlyTracked} hasTracked={hasTracked} days={windowDays} />
           }
         />
       )}
     </Screen>
+  );
+}
+
+/** Empty state that distinguishes "no list" from "nothing airing" for the tracked view. */
+function ScheduleEmpty({
+  onlyTracked,
+  hasTracked,
+  days,
+}: {
+  onlyTracked: boolean;
+  hasTracked: boolean;
+  days: number;
+}) {
+  if (!onlyTracked) {
+    return (
+      <EmptyState
+        emoji="✶"
+        title="No episodes scheduled"
+        subtitle="Check back later for upcoming episodes."
+      />
+    );
+  }
+  if (!hasTracked) {
+    return (
+      <EmptyState
+        emoji="📭"
+        title="Your list is empty"
+        subtitle="Add shows to your list to see their upcoming episodes here."
+      />
+    );
+  }
+  return (
+    <EmptyState
+      emoji="🌙"
+      title={`Nothing from your list airs in ${days} days`}
+      subtitle="None of your tracked titles have an upcoming episode. Completed and not-yet-released titles won't appear here."
+    />
   );
 }
 
