@@ -6,6 +6,8 @@ import { withAlpha } from '../../src/components/ui/Badge';
 import { LibraryRow } from '../../src/components/LibraryRow';
 import { ContinueWatchingRail } from '../../src/components/ContinueWatchingRail';
 import { EmptyState } from '../../src/components/EmptyState';
+import { SearchBar } from '../../src/components/SearchBar';
+import { SortSheet, SORT_OPTIONS, type SortKey } from '../../src/components/SortSheet';
 import { useTrackingStore } from '../../src/features/tracking/store';
 import {
   STATUS_META,
@@ -13,10 +15,24 @@ import {
   statusColor,
   type WatchStatus,
 } from '../../src/features/tracking/types';
-import { spacing, makeStyles, useTheme } from '../../src/theme';
+import { radii, spacing, makeStyles, useTheme } from '../../src/theme';
+
+import type { TrackEntry } from '../../src/features/tracking/types';
 
 const BOTTOM_SPACE = 110;
 type Filter = WatchStatus | 'ALL';
+
+type Comparator = (a: TrackEntry, b: TrackEntry) => number;
+
+const byRecent: Comparator = (a, b) => b.updatedAt - a.updatedAt;
+
+const SORT_COMPARATORS: Record<SortKey, Comparator> = {
+  recent: byRecent,
+  title: (a, b) => a.title.localeCompare(b.title) || byRecent(a, b),
+  // Unscored entries (score 0) naturally fall to the bottom of a desc sort.
+  score: (a, b) => b.score - a.score || byRecent(a, b),
+  progress: (a, b) => b.progress - a.progress || byRecent(a, b),
+};
 
 export default function LibraryScreen() {
   const entries = useTrackingStore((s) => s.entries);
@@ -24,11 +40,11 @@ export default function LibraryScreen() {
   const { colors } = useTheme();
   const styles = useStyles();
   const [filter, setFilter] = useState<Filter>('ALL');
+  const [query, setQuery] = useState('');
+  const [sortBy, setSortBy] = useState<SortKey>('recent');
+  const [sortOpen, setSortOpen] = useState(false);
 
-  const all = useMemo(
-    () => Object.values(entries).sort((a, b) => b.updatedAt - a.updatedAt),
-    [entries],
-  );
+  const all = useMemo(() => Object.values(entries), [entries]);
 
   const counts = useMemo(() => {
     const c: Record<string, number> = { ALL: all.length };
@@ -37,10 +53,27 @@ export default function LibraryScreen() {
     return c;
   }, [all]);
 
-  const filtered = filter === 'ALL' ? all : all.filter((e) => e.status === filter);
+  const q = query.trim().toLowerCase();
+  const searching = q.length > 0;
+
+  // filter (status) → search (title) → sort. Counts above stay on the full
+  // list so the chip badges don't shift while searching.
+  const filtered = useMemo(() => {
+    const list = all.filter(
+      (e) =>
+        (filter === 'ALL' || e.status === filter) &&
+        (!searching || e.title.toLowerCase().includes(q)),
+    );
+    return list.sort(SORT_COMPARATORS[sortBy]);
+  }, [all, filter, q, searching, sortBy]);
 
   // Only show status chips that actually have entries (keeps the bar tidy).
   const visibleStatuses = WATCH_STATUSES.filter((s) => counts[s] > 0);
+
+  const sortLabel = SORT_OPTIONS.find((o) => o.key === sortBy)!.label;
+  // The "Continue watching" rail is a resume affordance, not a search result —
+  // only surface it on the default unfiltered view.
+  const showRail = filter === 'ALL' && !searching && sortBy === 'recent';
 
   return (
     <Screen>
@@ -49,6 +82,28 @@ export default function LibraryScreen() {
           {all.length} {all.length === 1 ? 'TITLE' : 'TITLES'}
         </Text>
         <Text variant="display">Library</Text>
+
+        {all.length > 0 && (
+          <View style={styles.controls}>
+            <View style={styles.searchFlex}>
+              <SearchBar value={query} onChangeText={setQuery} placeholder="Search your list…" />
+            </View>
+            <Pressable
+              onPress={() => setSortOpen(true)}
+              style={styles.sortBtn}
+              hitSlop={6}
+              accessibilityRole="button"
+              accessibilityLabel={`Sort by ${sortLabel}`}
+            >
+              <Text variant="callout" color="textFaint">
+                ⇅
+              </Text>
+              <Text variant="callout" color="textMuted">
+                {sortLabel}
+              </Text>
+            </Pressable>
+          </View>
+        )}
       </View>
 
       {all.length > 0 && (
@@ -78,21 +133,36 @@ export default function LibraryScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
         renderItem={({ item }) => <LibraryRow entry={item} />}
-        ListHeaderComponent={filter === 'ALL' ? <ContinueWatchingRail /> : null}
+        ListHeaderComponent={showRail ? <ContinueWatchingRail /> : null}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         ListEmptyComponent={
           hydrated ? (
-            <EmptyState
-              emoji="📚"
-              title={filter === 'ALL' ? 'Your library is empty' : 'Nothing here yet'}
-              subtitle={
-                filter === 'ALL'
-                  ? 'Find a show on Discover and add it to start tracking.'
-                  : 'No titles with this status.'
-              }
-            />
+            searching ? (
+              <EmptyState
+                emoji="🔍"
+                title="No matches"
+                subtitle={`Nothing in your list matches “${query.trim()}”.`}
+              />
+            ) : (
+              <EmptyState
+                emoji="📚"
+                title={filter === 'ALL' ? 'Your library is empty' : 'Nothing here yet'}
+                subtitle={
+                  filter === 'ALL'
+                    ? 'Find a show on Discover and add it to start tracking.'
+                    : 'No titles with this status.'
+                }
+              />
+            )
           ) : null
         }
+      />
+
+      <SortSheet
+        value={sortBy}
+        visible={sortOpen}
+        onSelect={setSortBy}
+        onClose={() => setSortOpen(false)}
       />
     </Screen>
   );
@@ -138,6 +208,26 @@ const useStyles = makeStyles(({ colors }) => ({
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.md,
     gap: spacing.sm,
+  },
+  controls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  searchFlex: {
+    flex: 1,
+  },
+  sortBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    height: 48,
+    paddingHorizontal: spacing.md,
+    borderRadius: radii.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
   },
   chipsBar: {
     flexGrow: 0,
