@@ -1,8 +1,8 @@
-import { Modal, Pressable, View, StyleSheet } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Pressable, View, StyleSheet } from 'react-native';
 import { radii, spacing, useTheme } from '../theme';
 import { Text } from './ui/Text';
 import { withAlpha } from './ui/Badge';
+import { BottomSheet } from './ui/BottomSheet';
 import { displayTitle, type Media } from '../api/anilist';
 import { STATUS_META, WATCH_STATUSES, statusColor, type WatchStatus } from '../features/tracking/types';
 import { useTrackEntry, useTrackingStore } from '../features/tracking/store';
@@ -15,114 +15,77 @@ interface AddToListSheetProps {
 
 /** Bottom-sheet status picker for adding / moving / removing an anime. */
 export function AddToListSheet({ media, visible, onClose }: AddToListSheetProps) {
-  const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const entry = useTrackEntry(media?.id ?? -1);
   const track = useTrackingStore((s) => s.track);
   const untrack = useTrackingStore((s) => s.untrack);
 
-  if (!media) return null;
-
   const choose = (status: WatchStatus) => {
+    if (!media) return;
     track(media, status);
     onClose();
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose} />
-      <View
-        style={[
-          styles.sheet,
-          {
-            backgroundColor: colors.surfaceElevated,
-            borderColor: colors.borderStrong,
-            paddingBottom: insets.bottom + spacing.lg,
-          },
-        ]}
-      >
-        <View style={[styles.handle, { backgroundColor: colors.borderStrong }]} />
-        <Text variant="caption" color="textFaint" uppercase>
-          Add to list
-        </Text>
-        <Text variant="heading" numberOfLines={1} style={styles.title}>
-          {displayTitle(media.title)}
-        </Text>
+    <BottomSheet visible={visible} onClose={onClose}>
+      {media && (
+        <>
+          <Text variant="caption" color="textFaint" uppercase>
+            Add to list
+          </Text>
+          <Text variant="heading" numberOfLines={1} style={styles.title}>
+            {displayTitle(media.title)}
+          </Text>
 
-        <View style={styles.options}>
-          {WATCH_STATUSES.map((status) => {
-            const meta = STATUS_META[status];
-            const color = statusColor(colors, status);
-            const active = entry?.status === status;
-            return (
-              <Pressable
-                key={status}
-                onPress={() => choose(status)}
-                style={[
-                  styles.option,
-                  { borderColor: active ? color : colors.border },
-                  active && { backgroundColor: withAlpha(color, 0.14) },
-                ]}
-              >
-                <View style={[styles.optionDot, { backgroundColor: color }]} />
-                <Text variant="bodyMedium" color={active ? colors.text : colors.textMuted}>
-                  {meta.label}
-                </Text>
-                {active && (
-                  <Text variant="callout" color={color} style={styles.check}>
-                    ✓
+          <View style={styles.options}>
+            {WATCH_STATUSES.map((status) => {
+              const meta = STATUS_META[status];
+              const color = statusColor(colors, status);
+              const active = entry?.status === status;
+              return (
+                <Pressable
+                  key={status}
+                  onPress={() => choose(status)}
+                  style={[
+                    styles.option,
+                    { borderColor: active ? color : colors.border },
+                    active && { backgroundColor: withAlpha(color, 0.14) },
+                  ]}
+                >
+                  <View style={[styles.optionDot, { backgroundColor: color }]} />
+                  <Text variant="bodyMedium" color={active ? colors.text : colors.textMuted}>
+                    {meta.label}
                   </Text>
-                )}
-              </Pressable>
-            );
-          })}
-        </View>
+                  {active && (
+                    <Text variant="callout" color={color} style={styles.check}>
+                      ✓
+                    </Text>
+                  )}
+                </Pressable>
+              );
+            })}
+          </View>
 
-        {entry && (
-          <Pressable
-            onPress={() => {
-              untrack(media.id);
-              onClose();
-            }}
-            style={styles.remove}
-          >
-            <Text variant="callout" color={colors.danger}>
-              Remove from list
-            </Text>
-          </Pressable>
-        )}
-      </View>
-    </Modal>
+          {entry && (
+            <Pressable
+              onPress={() => {
+                untrack(media.id);
+                onClose();
+              }}
+              style={styles.remove}
+            >
+              <Text variant="callout" color={colors.danger}>
+                Remove from list
+              </Text>
+            </Pressable>
+          )}
+        </>
+      )}
+    </BottomSheet>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-  },
-  sheet: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderTopLeftRadius: radii['2xl'],
-    borderTopRightRadius: radii['2xl'],
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.md,
-    borderTopWidth: StyleSheet.hairlineWidth,
-  },
-  handle: {
-    alignSelf: 'center',
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    marginBottom: spacing.lg,
-  },
   title: {
     marginTop: 2,
     marginBottom: spacing.lg,

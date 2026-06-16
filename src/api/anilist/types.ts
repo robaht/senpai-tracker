@@ -120,6 +120,11 @@ export interface Media {
    */
   relations?: MediaRelationEdge[];
   /**
+   * Main characters + their (Japanese) voice actors. Only populated on the detail
+   * query; flattened from AniList's `characters { edges { … } }` by getAnimeById.
+   */
+  characters?: CharacterEdge[];
+  /**
    * Where-to-watch links. Only populated on the detail query; filtered to
    * STREAMING (non-disabled) by getAnimeById. Region handling lives in
    * lib/streaming.ts.
@@ -131,6 +136,58 @@ export interface Media {
 export interface MediaRelationEdge {
   relationType: MediaRelationType;
   node: Media;
+}
+
+/** A character's billing on a title. */
+export type CharacterRole = 'MAIN' | 'SUPPORTING' | 'BACKGROUND';
+
+/** A person credited on a title — here, a (Japanese) voice actor. */
+export interface VoiceActor {
+  id: number;
+  name: { full: string | null };
+  image: { large: string | null } | null;
+}
+
+/**
+ * A character on a title plus the voice actors who play them. Only populated on
+ * the detail query; flattened from AniList's `characters { edges { … } }` shape
+ * by getAnimeById. `voiceActors` is restricted to Japanese (see MEDIA_BY_ID_QUERY).
+ */
+export interface CharacterEdge {
+  role: CharacterRole | null;
+  node: {
+    id: number;
+    name: { full: string | null };
+    image: { large: string | null } | null;
+  };
+  voiceActors: VoiceActor[];
+}
+
+/**
+ * AniList's MediaListStatus enum — deliberately identical to our local
+ * `WatchStatus` (see features/tracking/types), so an imported entry's status
+ * drops straight onto a TrackEntry with no mapping.
+ */
+export type MediaListStatus =
+  | 'CURRENT'
+  | 'PLANNING'
+  | 'COMPLETED'
+  | 'DROPPED'
+  | 'PAUSED'
+  | 'REPEATING';
+
+/**
+ * One entry from a user's AniList list, normalized for import. `score` is on the
+ * 0–10 scale (queried via `score(format: POINT_10)`) and `updatedAt` is in epoch
+ * ms (AniList returns seconds; we convert) so it lines up with TrackEntry's
+ * last-write-wins merge field.
+ */
+export interface ImportedListEntry {
+  media: Media;
+  status: MediaListStatus;
+  progress: number;
+  score: number;
+  updatedAt: number;
 }
 
 /** Airing schedule row used by the weekly schedule screen. */

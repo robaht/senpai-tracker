@@ -14,6 +14,7 @@ import {
 } from '@expo-google-fonts/plus-jakarta-sans';
 import { QueryProvider } from '../src/providers/QueryProvider';
 import { useTrackingStore } from '../src/features/tracking/store';
+import { useComfortStore } from '../src/features/comfort/store';
 import { usePreferencesStore } from '../src/features/preferences/store';
 import { ThemeProvider, useTheme } from '../src/theme';
 
@@ -28,12 +29,14 @@ export default function RootLayout() {
 
   // Load persisted state into memory once at startup.
   const hydrateTracking = useTrackingStore((s) => s.hydrate);
+  const hydrateComfort = useComfortStore((s) => s.hydrate);
   const hydratePrefs = usePreferencesStore((s) => s.hydrate);
   const prefsHydrated = usePreferencesStore((s) => s.hydrated);
   useEffect(() => {
     void hydrateTracking();
+    void hydrateComfort();
     void hydratePrefs();
-  }, [hydrateTracking, hydratePrefs]);
+  }, [hydrateTracking, hydrateComfort, hydratePrefs]);
 
   // Gate on prefs too, so a saved light theme doesn't flash the dark default.
   const ready = fontsLoaded && prefsHydrated;
@@ -72,6 +75,9 @@ function RootNavigator({ ready }: { ready: boolean }) {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="anime/[id]" options={{ animation: 'slide_from_bottom' }} />
         <Stack.Screen name="settings" options={{ animation: 'slide_from_bottom' }} />
+        <Stack.Screen name="stats" options={{ animation: 'slide_from_bottom' }} />
+        <Stack.Screen name="comfort" options={{ animation: 'slide_from_bottom' }} />
+        <Stack.Screen name="seasons" options={{ animation: 'slide_from_bottom' }} />
       </Stack>
     </>
   );

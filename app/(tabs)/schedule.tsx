@@ -1,12 +1,12 @@
 import { useMemo, useState } from 'react';
-import { View, SectionList, StyleSheet, Pressable } from 'react-native';
+import { View, SectionList, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
 import { Screen } from '../../src/components/ui/Screen';
 import { Text } from '../../src/components/ui/Text';
 import { Skeleton } from '../../src/components/ui/Skeleton';
 import { withAlpha } from '../../src/components/ui/Badge';
 import { ScheduleRow } from '../../src/components/ScheduleRow';
 import { EmptyState } from '../../src/components/EmptyState';
-import { useAiringSchedule, useTrackedAiringSchedule } from '../../src/api/anilist/hooks';
+import { useAiringSchedule, useTrackedAiringSchedule, flattenPages } from '../../src/api/anilist/hooks';
 import { useTrackingStore } from '../../src/features/tracking/store';
 import { airingDayLabel } from '../../src/lib/format';
 import type { AiringScheduleItem } from '../../src/api/anilist';
@@ -20,6 +20,7 @@ const TRACKED_WINDOW_DAYS = 14;
 export default function ScheduleScreen() {
   const entries = useTrackingStore((s) => s.entries);
   const styles = useStyles();
+  const { colors } = useTheme();
   const [onlyTracked, setOnlyTracked] = useState(false);
 
   const trackedIds = useMemo(() => Object.keys(entries).map(Number), [entries]);
@@ -35,8 +36,12 @@ export default function ScheduleScreen() {
   // An empty tracked list disables the query (never "loading"); treat as resolved.
   const isLoading = onlyTracked ? hasTracked && active.isLoading : active.isLoading;
 
+  const loadMore = () => {
+    if (active.hasNextPage && !active.isFetchingNextPage) active.fetchNextPage();
+  };
+
   const sections = useMemo(() => {
-    const items = active.data?.items ?? [];
+    const items = flattenPages(active.data, (i) => i.id);
     const byDay = new Map<string, AiringScheduleItem[]>();
     for (const item of items) {
       const label = airingDayLabel(item.airingAt);
@@ -76,8 +81,10 @@ export default function ScheduleScreen() {
           contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}
           stickySectionHeadersEnabled={false}
-          onRefresh={active.refetch}
-          refreshing={false}
+          onRefresh={() => active.refetch()}
+          refreshing={active.isRefetching && !active.isFetchingNextPage}
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.5}
           renderSectionHeader={({ section }) => (
             <Text variant="callout" color="accentSoft" style={styles.sectionHeader}>
               {section.title}
@@ -85,6 +92,11 @@ export default function ScheduleScreen() {
           )}
           renderItem={({ item }) => <ScheduleRow item={item} />}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
+          ListFooterComponent={
+            active.isFetchingNextPage ? (
+              <ActivityIndicator color={colors.accent} style={styles.footer} />
+            ) : null
+          }
           ListEmptyComponent={
             <ScheduleEmpty onlyTracked={onlyTracked} hasTracked={hasTracked} days={windowDays} />
           }
@@ -215,5 +227,9 @@ const useStyles = makeStyles(({ colors }) => ({
   skeletonBody: {
     flex: 1,
     gap: spacing.sm,
+  },
+  footer: {
+    marginTop: spacing.lg,
+    marginBottom: spacing.xl,
   },
 }));

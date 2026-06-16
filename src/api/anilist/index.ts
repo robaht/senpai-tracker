@@ -6,11 +6,15 @@ import {
   SEASONAL_QUERY,
   TRACKED_AIRING_SCHEDULE_QUERY,
   TRENDING_QUERY,
+  USER_LIST_QUERY,
 } from './queries';
 import type {
   AiringScheduleItem,
+  CharacterEdge,
   ExternalLink,
+  ImportedListEntry,
   Media,
+  MediaListStatus,
   MediaRelationEdge,
   MediaSeason,
   Page,
@@ -64,18 +68,24 @@ export async function searchAnime(search: string, page = 1, perPage = 20): Promi
  * externalLinks arrives flat but carries INFO/SOCIAL + disabled entries we drop.
  */
 type RawExternalLink = ExternalLink & { type: string | null; isDisabled: boolean | null };
-type RawMediaDetail = Omit<Media, 'relations' | 'externalLinks'> & {
+type RawMediaDetail = Omit<Media, 'relations' | 'characters' | 'externalLinks'> & {
   relations?: { edges: MediaRelationEdge[] };
+  characters?: { edges: CharacterEdge[] };
   externalLinks?: RawExternalLink[];
 };
 
 export async function getAnimeById(id: number): Promise<Media> {
   const data = await anilistRequest<{ Media: RawMediaDetail }>(MEDIA_BY_ID_QUERY, { id });
-  const { relations, externalLinks, ...media } = data.Media;
+  const { relations, characters, externalLinks, ...media } = data.Media;
   const streaming = (externalLinks ?? [])
     .filter((l) => l.type === 'STREAMING' && !l.isDisabled)
     .map(({ type, isDisabled, ...link }) => link);
-  return { ...media, relations: relations?.edges ?? [], externalLinks: streaming };
+  return {
+    ...media,
+    relations: relations?.edges ?? [],
+    characters: characters?.edges ?? [],
+    externalLinks: streaming,
+  };
 }
 
 export async function getAiringSchedule(
@@ -112,6 +122,42 @@ export async function getTrackedAiringSchedule(
   return toPage(data.Page.pageInfo, data.Page.airingSchedules);
 }
 
+interface RawListEntry {
+  status: MediaListStatus;
+  progress: number | null;
+  score: number | null;
+  updatedAt: number | null;
+  media: Media | null;
+}
+
+/**
+ * Fetch a public AniList user's whole anime list by username, normalized and
+ * de-duplicated by media id (a title can appear in several lists). Throws if the
+ * user doesn't exist or the profile is private — the caller surfaces that.
+ */
+export async function getUserAnimeList(userName: string): Promise<ImportedListEntry[]> {
+  const data = await anilistRequest<{
+    MediaListCollection: { lists: { entries: RawListEntry[] }[] } | null;
+  }>(USER_LIST_QUERY, { userName });
+
+  const seen = new Set<number>();
+  const out: ImportedListEntry[] = [];
+  for (const list of data.MediaListCollection?.lists ?? []) {
+    for (const e of list.entries ?? []) {
+      if (!e.media || seen.has(e.media.id)) continue;
+      seen.add(e.media.id);
+      out.push({
+        media: e.media,
+        status: e.status,
+        progress: e.progress ?? 0,
+        score: Math.round(e.score ?? 0),
+        updatedAt: e.updatedAt ? e.updatedAt * 1000 : Date.now(),
+      });
+    }
+  }
+  return out;
+}
+
 /** Returns the AniList season + year for a given date (defaults to now). */
 export function currentSeason(date = new Date()): { season: MediaSeason; year: number } {
   const month = date.getMonth(); // 0-indexed
@@ -123,4 +169,29 @@ export function currentSeason(date = new Date()): { season: MediaSeason; year: n
   if (month <= 4) return { season: 'SPRING', year };
   if (month <= 7) return { season: 'SUMMER', year };
   return { season: 'FALL', year };
+}
+
+/** Seasons in AniList's calendar order; the year rolls over at the Fall→Winter wrap. */
+const SEASON_ORDER: MediaSeason[] = ['WINTER', 'SPRING', 'SUMMER', 'FALL'];
+
+/** The season+year before the given one (Winter → previous year's Fall). */
+export function prevSeason({ season, year }: { season: MediaSeason; year: number }): {
+  season: MediaSeason;
+  year: number;
+} {
+  const i = SEASON_ORDER.indexOf(season);
+  return i === 0
+    ? { season: 'FALL', year: year - 1 }
+    : { season: SEASON_ORDER[i - 1], year };
+}
+
+/** The season+year after the given one (Fall → next year's Winter). */
+export function nextSeason({ season, year }: { season: MediaSeason; year: number }): {
+  season: MediaSeason;
+  year: number;
+} {
+  const i = SEASON_ORDER.indexOf(season);
+  return i === SEASON_ORDER.length - 1
+    ? { season: 'WINTER', year: year + 1 }
+    : { season: SEASON_ORDER[i + 1], year };
 }

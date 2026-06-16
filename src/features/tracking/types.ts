@@ -33,6 +33,10 @@ export interface TrackEntry {
   coverImage: string | null;
   coverColor: string | null;
   format: string | null;
+  /** Episode length in minutes, if known. Powers the stats hours estimate. */
+  duration: number | null;
+  /** Genre names, if known. Powers the stats genre breakdown. */
+  genres: string[];
   // --- bookkeeping ---
   /** epoch ms — used for "recently updated" sorting and future sync conflict resolution. */
   updatedAt: number;

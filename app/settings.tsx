@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   View,
   ScrollView,
@@ -15,6 +16,7 @@ import { Screen } from '../src/components/ui/Screen';
 import { Text } from '../src/components/ui/Text';
 import { Badge, withAlpha } from '../src/components/ui/Badge';
 import { PressableScale } from '../src/components/ui/PressableScale';
+import { ImportFromAniListSheet } from '../src/components/ImportFromAniListSheet';
 import { usePreferencesStore, useRegion } from '../src/features/preferences/store';
 import { REGION_OPTIONS, regionLabel } from '../src/lib/streaming';
 import {
@@ -48,6 +50,8 @@ export default function SettingsScreen() {
   const setRegion = usePreferencesStore((s) => s.setRegion);
   const resolvedRegion = useRegion();
 
+  const [importOpen, setImportOpen] = useState(false);
+
   const following = mode === 'system';
   const systemIsDark = scheme !== 'light'; // treat null as dark
 
@@ -75,6 +79,27 @@ export default function SettingsScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
+        <Text variant="overline" color="textFaint" style={styles.sectionLabel}>
+          LIBRARY
+        </Text>
+        <Pressable
+          onPress={() => setImportOpen(true)}
+          style={[styles.row, { backgroundColor: colors.surface, borderColor: colors.border }]}
+          accessibilityRole="button"
+          accessibilityLabel="Import from AniList"
+        >
+          <View style={[styles.rowIcon, { backgroundColor: withAlpha(colors.accent, 0.16) }]}>
+            <Ionicons name="cloud-download-outline" size={18} color={colors.accent} />
+          </View>
+          <View style={styles.rowText}>
+            <Text variant="bodyMedium">Import from AniList</Text>
+            <Text variant="caption" color="textFaint">
+              Bring in a public AniList user's list by username
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={colors.textFaint} />
+        </Pressable>
+
         <Text variant="overline" color="textFaint" style={styles.sectionLabel}>
           APPEARANCE
         </Text>
@@ -193,6 +218,8 @@ export default function SettingsScreen() {
           Themes and region apply instantly and are saved on this device.
         </Text>
       </ScrollView>
+
+      <ImportFromAniListSheet visible={importOpen} onClose={() => setImportOpen(false)} />
     </Screen>
   );
 }

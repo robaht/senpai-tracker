@@ -4,6 +4,7 @@ import {
   StyleSheet,
   useWindowDimensions,
   ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -25,7 +26,7 @@ import { SectionHeader } from '../../src/components/SectionHeader';
 import { FeaturedCard } from '../../src/components/FeaturedCard';
 import { PosterCard } from '../../src/components/PosterCard';
 import { EmptyState } from '../../src/components/EmptyState';
-import { useSeasonal, useTrending, useSearchAnime } from '../../src/api/anilist/hooks';
+import { useSeasonal, useTrending, useSearchAnime, flattenPages } from '../../src/api/anilist/hooks';
 import { currentSeason, type Media } from '../../src/api/anilist';
 import { spacing, useTheme } from '../../src/theme';
 
@@ -53,7 +54,16 @@ export default function DiscoverScreen() {
   const featuredWidth = Math.min(width - H_PADDING * 2, 520);
 
   const seasonLabel = `${season.charAt(0) + season.slice(1).toLowerCase()} ${year}`;
-  const gridData: Media[] = isSearching ? (search.data?.items ?? []) : (seasonal.data?.items ?? []);
+
+  const seasonalItems = useMemo(() => flattenPages(seasonal.data, (m) => m.id), [seasonal.data]);
+  const searchItems = useMemo(() => flattenPages(search.data, (m) => m.id), [search.data]);
+  const gridData: Media[] = isSearching ? searchItems : seasonalItems;
+
+  // The query that drives the grid — its paging + refresh control the list below.
+  const gridQuery = isSearching ? search : seasonal;
+  const loadMore = () => {
+    if (gridQuery.hasNextPage && !gridQuery.isFetchingNextPage) gridQuery.fetchNextPage();
+  };
 
   // Vertical scroll drives the hero parallax/fade.
   const scrollY = useSharedValue(0);
@@ -88,6 +98,21 @@ export default function DiscoverScreen() {
         keyboardShouldPersistTaps="handled"
         onScroll={onScroll}
         scrollEventThrottle={16}
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.5}
+        refreshControl={
+          <RefreshControl
+            refreshing={gridQuery.isRefetching && !gridQuery.isFetchingNextPage}
+            onRefresh={() => gridQuery.refetch()}
+            tintColor={colors.accent}
+            colors={[colors.accent]}
+          />
+        }
+        ListFooterComponent={
+          gridQuery.isFetchingNextPage ? (
+            <ActivityIndicator color={colors.accent} style={styles.footer} />
+          ) : null
+        }
         ListHeaderComponent={
           <View style={styles.header}>
             <Animated.View style={[styles.topRow, heroStyle]}>
@@ -105,7 +130,7 @@ export default function DiscoverScreen() {
               <PressableScale
                 onPress={() => router.push('/settings')}
                 accessibilityRole="button"
-                accessibilityLabel="Settings and themes"
+                accessibilityLabel="Settings"
               >
                 <LinearGradient
                   colors={gradients.brand}
@@ -113,7 +138,7 @@ export default function DiscoverScreen() {
                   end={{ x: 1, y: 1 }}
                   style={styles.avatar}
                 >
-                  <Ionicons name="color-palette" size={20} color={colors.onMedia} />
+                  <Ionicons name="settings-sharp" size={20} color={colors.onMedia} />
                 </LinearGradient>
               </PressableScale>
             </Animated.View>
@@ -135,11 +160,24 @@ export default function DiscoverScreen() {
               </View>
             )}
 
-            <View style={styles.sectionTitle}>
+            <View style={[styles.sectionTitle, styles.sectionRow]}>
               <SectionHeader
                 title={isSearching ? 'Results' : 'Popular this season'}
                 caption={isSearching ? `“${query.trim()}”` : seasonLabel}
               />
+              {!isSearching && (
+                <PressableScale
+                  onPress={() => router.push('/seasons')}
+                  accessibilityRole="button"
+                  accessibilityLabel="Browse seasons"
+                  style={styles.browseLink}
+                >
+                  <Text variant="caption" color={colors.accent}>
+                    Browse seasons
+                  </Text>
+                  <Ionicons name="chevron-forward" size={14} color={colors.accent} />
+                </PressableScale>
+              )}
             </View>
           </View>
         }
@@ -276,6 +314,17 @@ const styles = StyleSheet.create({
   sectionTitle: {
     marginTop: spacing.sm,
   },
+  sectionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  browseLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    marginBottom: spacing.md,
+  },
   column: {
     gap: COL_GAP,
     marginBottom: spacing.lg,
@@ -287,5 +336,9 @@ const styles = StyleSheet.create({
   },
   spinner: {
     marginTop: spacing['4xl'],
+  },
+  footer: {
+    marginTop: spacing.lg,
+    marginBottom: spacing.xl,
   },
 });

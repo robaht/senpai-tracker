@@ -16,22 +16,17 @@ so any one can be picked up cold and started smoothly.
 |----|---------|----------|--------|------------|
 | F1 | User accounts & cloud sync | P1 | L | — |
 | F3 | New-season alerts for watched anime + Upcoming screen | P2 | M–L | Notif. infra, (F1 for true push) |
-| F4 | Seasonal browser (any winter/spring/summer/fall) | P3 | S–M | — |
 | F5 | Recommender ("similar to X" / for you) | P2 | M | — |
 | F7 | Deep multi-hop season chain (full S1→S2→S3 ordering) | P3 | M | — (extends shipped F2) |
 | F8 | Super Follow (per-title new-season announcement alerts) | P2 | M | Notif. infra, F1 (true push) |
-| F12 | Cast & characters on detail | P2 | M | — |
-| F14 | Your stats / "Year in anime" | P3 | M | — |
-| F16 | Pull-to-refresh + pagination | P2 | M | — |
-| F17 | Backup / export & import (JSON) | P3 | S | — |
 | F18 | Genre / tag browse & filters | P2 | M | — (pairs with F4) |
-| F20 | Import list from MyAnimeList | P2 | M | — (shares F17 import plumbing) |
+| F20 | Import list from MyAnimeList | P2 | M | — (shares shipped import/merge plumbing) |
+| F21 | Anime Wrapped (shareable year-in-review story) | P3 | M–L | shipped F14 (stat derivation); needs share/export plumbing |
 
 **Suggested build order** (fast value first, heavy infra last):
-`F12 → F14 → F16 → F17 → F4 → F18 → F5 → F1 → F3 → F7 → F8`.
-Start with detail depth (F12), then insights (F14) and plumbing
-(F16/F17). The heavier
-discovery/infra items (F4/F18/F5/F1/F3/F7/F8) come last. Reorder freely — entries
+`F21 → F18 → F5 → F1 → F3 → F7 → F8`.
+Start with the shareable insights story (F21, building on shipped F14). The heavier
+discovery/infra items (F18/F5/F1/F3/F7/F8) come last. Reorder freely — entries
 are independent except where "Depends on" says otherwise.
 
 ### Shared prerequisites (cross-cutting)
@@ -108,27 +103,6 @@ announced or starts airing, surface it (and optionally notify).
 - **Limitation:** true *announcement* push (notify the moment AniList adds a
   sequel, app closed) needs a server polling AniList → depends on **F1's backend**.
   Without it, detection happens on app open. Document this clearly.
-
----
-
-## F4 — Seasonal browser (any season, past & future)
-
-**Goal:** Browse any anime season/year, not just the current one.
-
-### Requirements / acceptance criteria
-- [ ] User can pick a season (Winter/Spring/Summer/Fall) and year and see that
-      season's anime grid.
-- [ ] Easy nav to previous/next season and quick "current season" reset.
-- [ ] Future seasons (not-yet-released) are browsable too.
-
-### Technical approach
-- Backend already exists: `getSeasonal(season, year)` + `SEASONAL_QUERY`. The
-  current `useSeasonal()` hook is hardcoded to the current season — add a
-  parameterized `useSeasonalBrowse(season, year)` hook.
-- Add `prevSeason()` / `nextSeason()` helpers next to `currentSeason()` in
-  `api/anilist/index.ts`.
-- UI: a season segmented control + year stepper. New screen `app/seasons.tsx`
-  (push from Discover) or a "Seasons" entry point. Reuse `PosterCard` grid.
 
 ---
 
@@ -249,106 +223,6 @@ the same detection plumbing and notification infra.
 
 ---
 
-## F12 — Cast & characters on detail
-
-**Goal:** Show the main characters (and their voice actors) on a title — table
-stakes for an anime app, currently absent.
-
-### Requirements / acceptance criteria
-- [ ] The detail screen shows a horizontal rail of main characters with portrait + name.
-- [ ] Each character optionally shows its (Japanese) voice actor.
-- [ ] The rail is capped to a sensible number (e.g. top ~10 by role) with graceful
-      empty/partial handling.
-
-### Technical approach
-- Extend `MEDIA_BY_ID_QUERY` (`src/api/anilist/queries.ts`) with
-  `characters(sort: ROLE, perPage: 12) { edges { role node { id name { full } image { large } } voiceActors(language: JAPANESE) { id name { full } image { large } } } }`.
-- Add the shape to the `Media` detail type in `src/api/anilist/types.ts` and map it
-  in `getAnimeById` (`src/api/anilist/index.ts`), mirroring how `relations.edges`
-  is flattened today.
-- New `CharacterRail` component (reuse the rail pattern from `RelationsRail`),
-  rendered in `app/anime/[id].tsx` below the info card.
-- Keep it on the single detail fetch (no extra request); mind payload size by
-  capping `perPage`.
-
----
-
-## F14 — Your stats / "Year in anime"
-
-**Goal:** Turn the library into insights — a stats view users want to revisit and share.
-
-### Requirements / acceptance criteria
-- [ ] A stats view shows totals: titles tracked, episodes watched, estimated hours,
-      and counts per status.
-- [ ] A genre/format breakdown of the user's list (top genres by frequency).
-- [ ] Score insights: mean user score and a simple score distribution.
-- [ ] All computed from the local list; works offline.
-
-### Technical approach
-- 100% local — derive from `useTrackingStore` entries. Hours ≈ `Σ progress ×
-  duration`; the `TrackEntry` snapshot lacks `duration`/`genres`, so either (a)
-  extend the snapshot to store them on `track()` (`src/features/tracking/store.ts`
-  `snapshotFromMedia`) going forward, or (b) hydrate from the TanStack Query detail
-  cache where present. Document the approximation.
-- New screen `app/stats.tsx` (push from Library header or Settings), built from
-  small stat cards + a lightweight bar/donut (hand-rolled with `View`s to avoid a
-  charting dep, matching the token system).
-- Reuse `SectionHeader`, `Card`, and `statusColor` for the per-status rows.
-
----
-
-## F16 — Pull-to-refresh + pagination
-
-**Goal:** Let users refresh and scroll past the first page on Discover, Search,
-and Schedule (today they're capped at one page).
-
-### Requirements / acceptance criteria
-- [ ] Pull-to-refresh on Discover, Search, and Schedule re-fetches the first page.
-- [ ] Scrolling to the end of a grid/list loads the next page (infinite scroll),
-      with a footer spinner and a clean "end reached" state.
-- [ ] Loading more never duplicates items and respects AniList's ~90 req/min limit.
-
-### Technical approach
-- Swap the affected `useQuery` hooks (`useTrending`, `useSeasonal`,
-  `useSearchAnime`, `useAiringSchedule` in `src/api/anilist/hooks.ts`) to
-  `useInfiniteQuery`, using the existing `pageInfo.hasNextPage`/`currentPage` from
-  the API fns in `src/api/anilist/index.ts` as the cursor.
-- Wire `onEndReached` + `refreshControl` on the `FlatList`s in
-  `app/(tabs)/index.tsx` and `app/(tabs)/schedule.tsx`; flatten `data.pages` for
-  `renderItem`.
-- Keep `perPage` modest and rely on TanStack Query dedup/cache to stay under the
-  rate limit.
-- Also paginate `useTrackedAiringSchedule` (Schedule "My list"): it's id-filtered
-  so it rarely overflows, but a power user tracking 50+ currently-airing titles
-  would hit the same single-page (`perPage: 50`) cap.
-
----
-
-## F17 — Backup / export & import (JSON)
-
-**Goal:** Protect the local-only list from loss (uninstall, device change) before
-cloud sync (F1) lands — and provide a migration on-ramp for it.
-
-### Requirements / acceptance criteria
-- [ ] The user can export their entire watch list to a JSON file (share sheet / save).
-- [ ] The user can import a previously exported file, merging into (or replacing)
-      the current list without corrupting existing entries.
-- [ ] Export round-trips losslessly: import-of-export yields the same list.
-- [ ] Clear feedback on success/failure and on how conflicts are resolved.
-
-### Technical approach
-- Export: serialize `trackingRepository.getAll()` (the same `TrackEntry[]` behind
-  the `senpai:tracking:v1` key) to JSON; write + share via `expo-file-system` +
-  `expo-sharing`.
-- Import: `expo-document-picker` → parse/validate → merge by `mediaId` using the
-  existing `updatedAt` field (last-write-wins, the same rule F1 will use). Add a
-  `replaceAll`/merge path on the repository (`src/features/tracking/repository.ts`)
-  and refresh the store via `hydrate()`.
-- Entry point: a row in `app/settings.tsx`. This deliberately prototypes F1's
-  merge/conflict logic on a smaller surface.
-
----
-
 ## F18 — Genre / tag browse & filters
 
 **Goal:** Discovery beyond free-text search — browse by genre/tag with sorting.
@@ -356,7 +230,7 @@ cloud sync (F1) lands — and provide a migration on-ramp for it.
 ### Requirements / acceptance criteria
 - [ ] The user can browse anime filtered by one or more genres (and optionally tags).
 - [ ] Results can be sorted (e.g. Popularity, Score, Trending).
-- [ ] Filters compose with the seasonal browser (F4) where it makes sense
+- [ ] Filters compose with the shipped seasonal browser (F4) where it makes sense
       (genre + season + year).
 - [ ] Clear active-filter display and a one-tap reset.
 
@@ -366,7 +240,7 @@ cloud sync (F1) lands — and provide a migration on-ramp for it.
   plus a `browse(filters, page)` fn in `src/api/anilist/index.ts` and a
   `useBrowse(filters)` hook in `src/api/anilist/hooks.ts` (genre list itself comes
   from AniList's `GenreCollection`, fetched once + cached).
-- New screen `app/browse.tsx` (or fold into F4's seasons screen): a genre chip
+- New screen `app/browse.tsx` (or fold into the shipped F4 seasons screen): a genre chip
   multi-select + sort control, rendering the existing `PosterCard` grid.
 - Builds naturally on F16's infinite-scroll once that lands; cap fan-out for the
   rate limit.
@@ -408,11 +282,64 @@ so switching trackers isn't a from-scratch re-entry.
   in `src/api/anilist/queries.ts` / `index.ts`, batched in chunks of ~50 and cached
   via TanStack Query to respect the rate limit. Build `TrackEntry`s from the
   resolved `Media` (reusing the store's `snapshotFromMedia`).
-- **Merge:** write through a `replaceAll`/merge path on
-  `src/features/tracking/repository.ts`, last-write-wins by `updatedAt` — the *same
-  plumbing F17 introduces*, so build F17 first (or together) and share it.
+- **Merge:** reuse the **shipped** import/merge plumbing — `useTrackingStore.importFromList(list, mode)`
+  (last-write-wins by `updatedAt`, built for the AniList-username import) and the
+  repository's `replaceAll`. MAL import just needs to produce the same
+  `ImportedListEntry[]` shape and hand it to `importFromList`.
 - **UI:** an "Import from MyAnimeList" row in `app/settings.tsx` with a picker,
   progress, and an unresolved-titles summary.
 - **Optional upgrade (later):** MAL official OAuth2 API for a no-file, live import
   — heavier (register a client id + `expo-auth-session` flow), defer until the XML
   path proves the mapping/merge.
+
+---
+
+## F21 — Anime Wrapped (shareable year-in-review story)
+
+**Goal:** A swipeable, animated, shareable "year in anime" — Spotify-Wrapped-style
+— generated from the user's tracked list.
+
+### How this differs from F14
+F14 is an always-on **stats dashboard** you open to look things up. F21 is a
+seasonal, narrative, full-screen **story** you swipe through and share to social.
+F14 = reference; F21 = a moment built to be screenshotted and posted. They share
+the same underlying stat derivation; F21 is the presentation/virality layer on top.
+
+### Requirements / acceptance criteria
+- [ ] A full-screen, swipeable sequence of story cards (tap or swipe to advance),
+      each surfacing one headline stat with a bold visual treatment.
+- [ ] Cards cover the highlights: titles completed, episodes watched, estimated
+      hours, top genre(s), highest-rated title, busiest period, status breakdown.
+- [ ] A "personality"/standout card (e.g. your #1 by score, or most-binged title).
+- [ ] A final summary card is exportable as an image to the OS share sheet
+      (Instagram / X / etc.).
+- [ ] Scoped to a period (default: current year, year selectable) and computed
+      entirely from the local list — works offline.
+- [ ] Tasteful motion: cards animate in; honors the OS "reduce motion" setting.
+- [ ] Graceful with a sparse list (few entries): still yields a coherent story or
+      a friendly "not enough watched yet" state.
+
+### Technical approach
+- **Data (shared with F14):** derive everything from `useTrackingStore` entries
+  (`src/features/tracking/store.ts`), filtered to the period via
+  `TrackEntry.updatedAt`. Factor the math into a shared `computeStats(entries,
+  range)` helper so F14's dashboard and F21's story read from one source of truth.
+  Same snapshot caveat as F14 — the `TrackEntry` snapshot lacks `duration`/`genres`,
+  so hours and genre breakdown need either extending `snapshotFromMedia` going
+  forward or hydrating from the TanStack Query detail cache; document the estimate.
+- **Screen:** new `app/wrapped.tsx` as a full-screen modal route (expo-router),
+  pushed from the Library/Settings header and from F14's stats screen. A
+  horizontally-paged `FlatList` (or a `react-native-reanimated` pager) of
+  `WrappedCard`s, with a segmented progress bar on top and tap-to-advance + swipe.
+- **Motion:** `react-native-reanimated` for entrance/parallax; gate it on
+  `AccessibilityInfo.isReduceMotionEnabled` for the reduce-motion path.
+- **Share/export:** capture a card to an image with `react-native-view-shot`
+  (`captureRef`), then share via `expo-sharing` + `expo-file-system`. This share
+  plumbing is **net-new** — the shipped AniList import only *reads* a list, so no
+  file-export/share path exists yet. Use a dedicated share-card layout (9:16 /
+  square) distinct from the on-screen card so exports look intentional.
+- **Visuals:** hand-rolled `View`s + gradients on the existing token system (no
+  charting dep), reusing `statusColor`, `SectionHeader`, and `Card`, matching F14.
+- **Limitation to document:** tracking has no true "watched-on" timestamp beyond
+  `updatedAt`, so per-month/season attribution is approximate until richer history
+  is stored — call this out in the "busiest period" card.

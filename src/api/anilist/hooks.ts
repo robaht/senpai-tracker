@@ -1,4 +1,9 @@
-import { useQuery, keepPreviousData } from '@tanstack/react-query';
+import {
+  useInfiniteQuery,
+  useQuery,
+  keepPreviousData,
+  type InfiniteData,
+} from '@tanstack/react-query';
 import {
   currentSeason,
   getAiringSchedule,
@@ -8,6 +13,7 @@ import {
   getTrending,
   searchAnime,
 } from './index';
+import type { MediaSeason, Page } from './types';
 
 /**
  * Centralized query keys. Anything that reads or invalidates AniList data
@@ -25,6 +31,34 @@ export const animeKeys = {
     [...animeKeys.all, 'airing', 'tracked', ids, from, to] as const,
 };
 
+/**
+ * Flatten an infinite query's pages into a single de-duplicated list. AniList's
+ * popularity/trending sorts can shift an item across page boundaries, so the
+ * same id occasionally appears on two pages — dedupe by id to honor "never
+ * duplicates" and avoid duplicate React keys.
+ */
+export function flattenPages<T>(
+  data: InfiniteData<Page<T>> | undefined,
+  getId: (item: T) => number | string,
+): T[] {
+  if (!data) return [];
+  const seen = new Set<number | string>();
+  const out: T[] = [];
+  for (const page of data.pages) {
+    for (const item of page.items) {
+      const id = getId(item);
+      if (seen.has(id)) continue;
+      seen.add(id);
+      out.push(item);
+    }
+  }
+  return out;
+}
+
+/** `getNextPageParam` shared by every paged AniList query. */
+const nextPage = (last: Page<unknown>) =>
+  last.pageInfo.hasNextPage ? last.pageInfo.currentPage + 1 : undefined;
+
 export function useTrending() {
   return useQuery({
     queryKey: animeKeys.trending(),
@@ -32,19 +66,28 @@ export function useTrending() {
   });
 }
 
+/** Browse any season + year. Shares the seasonal cache key with `useSeasonal`. */
+export function useSeasonalBrowse(season: MediaSeason, year: number) {
+  return useInfiniteQuery({
+    queryKey: animeKeys.seasonal(season, year),
+    queryFn: ({ pageParam }) => getSeasonal(season, year, pageParam, 24),
+    initialPageParam: 1,
+    getNextPageParam: nextPage,
+  });
+}
+
 export function useSeasonal() {
   const { season, year } = currentSeason();
-  return useQuery({
-    queryKey: animeKeys.seasonal(season, year),
-    queryFn: () => getSeasonal(season, year, 1, 24),
-  });
+  return useSeasonalBrowse(season, year);
 }
 
 export function useSearchAnime(query: string) {
   const trimmed = query.trim();
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: animeKeys.search(trimmed),
-    queryFn: () => searchAnime(trimmed, 1, 30),
+    queryFn: ({ pageParam }) => searchAnime(trimmed, pageParam, 30),
+    initialPageParam: 1,
+    getNextPageParam: nextPage,
     enabled: trimmed.length >= 2,
     placeholderData: keepPreviousData,
   });
@@ -62,9 +105,11 @@ export function useAnime(id: number) {
 export function useAiringSchedule(days = 7) {
   const from = Math.floor(Date.now() / 1000);
   const to = from + days * 24 * 60 * 60;
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: animeKeys.airing(from - (from % 3600), to - (to % 3600)),
-    queryFn: () => getAiringSchedule(from, to, 1, 50),
+    queryFn: ({ pageParam }) => getAiringSchedule(from, to, pageParam, 50),
+    initialPageParam: 1,
+    getNextPageParam: nextPage,
   });
 }
 
@@ -78,9 +123,11 @@ export function useTrackedAiringSchedule(ids: number[], days = 14) {
   const sorted = [...ids].sort((a, b) => a - b);
   const from = Math.floor(Date.now() / 1000);
   const to = from + days * 24 * 60 * 60;
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: animeKeys.trackedAiring(sorted, from - (from % 3600), to - (to % 3600)),
-    queryFn: () => getTrackedAiringSchedule(sorted, from, to, 1, 50),
+    queryFn: ({ pageParam }) => getTrackedAiringSchedule(sorted, from, to, pageParam, 50),
+    initialPageParam: 1,
+    getNextPageParam: nextPage,
     enabled: sorted.length > 0,
   });
 }

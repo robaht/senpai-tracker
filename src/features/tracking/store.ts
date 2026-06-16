@@ -1,7 +1,21 @@
 import { create } from 'zustand';
-import { displayTitle, type Media } from '../../api/anilist';
+import { displayTitle, type ImportedListEntry, type Media } from '../../api/anilist';
 import { trackingRepository } from './repository';
 import type { TrackEntry, WatchStatus } from './types';
+
+/** Outcome of an import, surfaced to the user. */
+export interface ImportSummary {
+  /** Titles new to the local list. */
+  added: number;
+  /** Existing titles overwritten because the imported copy was newer. */
+  updated: number;
+  /** Existing titles left as-is (local copy was newer, or replace mode). */
+  unchanged: number;
+  /** Total titles in the imported list. */
+  total: number;
+}
+
+export type ImportMode = 'merge' | 'replace';
 
 interface TrackingState {
   entries: Record<number, TrackEntry>;
@@ -17,11 +31,18 @@ interface TrackingState {
   setProgress: (mediaId: number, progress: number) => void;
   incrementProgress: (mediaId: number) => void;
   setScore: (mediaId: number, score: number) => void;
+
+  /**
+   * Bulk-import a list (e.g. from an AniList username). `merge` keeps whichever
+   * copy is newer per title (last-write-wins by `updatedAt`, the same rule F1's
+   * sync will use); `replace` swaps the whole list for the imported one.
+   */
+  importFromList: (list: ImportedListEntry[], mode: ImportMode) => ImportSummary;
 }
 
 function snapshotFromMedia(media: Media): Pick<
   TrackEntry,
-  'title' | 'coverImage' | 'coverColor' | 'format' | 'totalEpisodes'
+  'title' | 'coverImage' | 'coverColor' | 'format' | 'totalEpisodes' | 'duration' | 'genres'
 > {
   return {
     title: displayTitle(media.title),
@@ -29,6 +50,8 @@ function snapshotFromMedia(media: Media): Pick<
     coverColor: media.coverImage?.color ?? null,
     format: media.format ?? null,
     totalEpisodes: media.episodes ?? null,
+    duration: media.duration ?? null,
+    genres: media.genres ?? [],
   };
 }
 
@@ -107,6 +130,44 @@ export const useTrackingStore = create<TrackingState>((set, get) => {
     },
 
     setScore: (mediaId, score) => update(mediaId, { score: Math.max(0, Math.min(score, 10)) }),
+
+    importFromList: (list, mode) => {
+      const current = get().entries;
+      const next: Record<number, TrackEntry> = mode === 'replace' ? {} : { ...current };
+      let added = 0;
+      let updated = 0;
+      let unchanged = 0;
+
+      for (const item of list) {
+        const existing = current[item.media.id];
+        const incoming: TrackEntry = {
+          mediaId: item.media.id,
+          status: item.status,
+          progress: item.progress,
+          score: Math.max(0, Math.min(item.score, 10)),
+          ...snapshotFromMedia(item.media),
+          createdAt: existing?.createdAt ?? item.updatedAt,
+          updatedAt: item.updatedAt,
+        };
+
+        if (mode === 'replace') {
+          next[item.media.id] = incoming;
+          added += 1;
+        } else if (!existing) {
+          next[item.media.id] = incoming;
+          added += 1;
+        } else if (item.updatedAt > existing.updatedAt) {
+          next[item.media.id] = incoming;
+          updated += 1;
+        } else {
+          unchanged += 1;
+        }
+      }
+
+      set({ entries: next });
+      void trackingRepository.replaceAll(Object.values(next));
+      return { added, updated, unchanged, total: list.length };
+    },
   };
 });
 

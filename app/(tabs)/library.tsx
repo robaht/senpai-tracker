@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react';
 import { View, FlatList, ScrollView, StyleSheet, Pressable } from 'react-native';
+import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '../../src/components/ui/Screen';
 import { Text } from '../../src/components/ui/Text';
 import { withAlpha } from '../../src/components/ui/Badge';
@@ -37,6 +39,7 @@ const SORT_COMPARATORS: Record<SortKey, Comparator> = {
 export default function LibraryScreen() {
   const entries = useTrackingStore((s) => s.entries);
   const hydrated = useTrackingStore((s) => s.hydrated);
+  const router = useRouter();
   const { colors } = useTheme();
   const styles = useStyles();
   const [filter, setFilter] = useState<Filter>('ALL');
@@ -78,10 +81,36 @@ export default function LibraryScreen() {
   return (
     <Screen>
       <View style={styles.headerWrap}>
-        <Text variant="overline" color="textFaint">
-          {all.length} {all.length === 1 ? 'TITLE' : 'TITLES'}
-        </Text>
-        <Text variant="display">Library</Text>
+        <View style={styles.titleRow}>
+          <View>
+            <Text variant="overline" color="textFaint">
+              {all.length} {all.length === 1 ? 'TITLE' : 'TITLES'}
+            </Text>
+            <Text variant="display">Library</Text>
+          </View>
+          <View style={styles.headerBtns}>
+            <Pressable
+              onPress={() => router.push('/comfort')}
+              style={styles.statsBtn}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Open your Comfort Corner"
+            >
+              <Ionicons name="cafe" size={20} color={colors.accentAlt} />
+            </Pressable>
+            {all.length > 0 && (
+              <Pressable
+                onPress={() => router.push('/stats')}
+                style={styles.statsBtn}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="View your stats"
+              >
+                <Ionicons name="stats-chart" size={20} color={colors.text} />
+              </Pressable>
+            )}
+          </View>
+        </View>
 
         {all.length > 0 && (
           <View style={styles.controls}>
@@ -208,6 +237,26 @@ const useStyles = makeStyles(({ colors }) => ({
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.md,
     gap: spacing.sm,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  headerBtns: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  statsBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: radii.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   controls: {
     flexDirection: 'row',

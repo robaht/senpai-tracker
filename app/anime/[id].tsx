@@ -27,12 +27,14 @@ import { CountdownPill } from '../../src/components/CountdownPill';
 import { AddToListSheet } from '../../src/components/AddToListSheet';
 import { EmptyState } from '../../src/components/EmptyState';
 import { RelationsRail } from '../../src/components/RelationsRail';
+import { CharacterRail } from '../../src/components/CharacterRail';
 import { TrailerCard } from '../../src/components/TrailerCard';
 import { StreamingLinks } from '../../src/components/StreamingLinks';
 import { RatingStars } from '../../src/components/RatingStars';
 import { useAnime } from '../../src/api/anilist/hooks';
 import { displayTitle } from '../../src/api/anilist';
 import { useTrackEntry, useTrackingStore } from '../../src/features/tracking/store';
+import { useComfortStore, useIsComfort } from '../../src/features/comfort/store';
 import { STATUS_META, statusColor } from '../../src/features/tracking/types';
 import { formatScore, humanizeEnum, stripHtml } from '../../src/lib/format';
 import { radii, spacing, makeStyles, useTheme } from '../../src/theme';
@@ -48,6 +50,8 @@ export default function AnimeDetailScreen() {
 
   const { data: media, isLoading, isError } = useAnime(mediaId);
   const entry = useTrackEntry(mediaId);
+  const isComfort = useIsComfort(mediaId);
+  const toggleComfort = useComfortStore((s) => s.toggle);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [descExpanded, setDescExpanded] = useState(false);
 
@@ -177,6 +181,22 @@ export default function AnimeDetailScreen() {
               />
             )}
 
+            {/* Comfort Corner toggle — a curated comfort pick, independent of status */}
+            <Button
+              label={isComfort ? 'In your Comfort Corner' : 'Add to Comfort'}
+              variant="secondary"
+              fullWidth
+              icon={
+                <Ionicons
+                  name={isComfort ? 'cafe' : 'cafe-outline'}
+                  size={18}
+                  color={isComfort ? colors.accentAlt : colors.text}
+                />
+              }
+              onPress={() => toggleComfort(media)}
+              style={styles.comfortBtn}
+            />
+
             {/* Genres */}
             {media.genres.length > 0 && (
               <View style={styles.genres}>
@@ -230,6 +250,9 @@ export default function AnimeDetailScreen() {
                 <InfoRow label="Popularity" value={`#${media.popularity.toLocaleString()}`} last />
               ) : null}
             </Card>
+
+            {/* Cast — tap a character for role + voice actor */}
+            <CharacterRail media={media} />
 
             {/* Related anime / season chain */}
             <RelationsRail media={media} />
@@ -399,6 +422,7 @@ const useStyles = makeStyles(({ colors }) => ({
   },
   airing: { marginTop: spacing.lg },
   addBtn: { marginTop: spacing.xl },
+  comfortBtn: { marginTop: spacing.md },
   panel: { marginTop: spacing.xl, gap: spacing.lg },
   panelDivider: {
     height: StyleSheet.hairlineWidth,

@@ -111,6 +111,9 @@ export const SEARCH_QUERY = gql`
  * related node reuses MediaFields (so it's a full Media and PosterCard works on
  * it directly), but nodes intentionally omit their own `relations` to keep the
  * payload bounded (relations are a graph; one hop is enough for the detail rail).
+ *
+ * Also pulls `characters` (top ~12 by role) with their Japanese voice actors, on
+ * the same single fetch — `perPage` is capped to keep the payload bounded.
  */
 export const MEDIA_BY_ID_QUERY = gql`
   ${MEDIA_FIELDS}
@@ -125,6 +128,29 @@ export const MEDIA_BY_ID_QUERY = gql`
           }
         }
       }
+      characters(sort: [ROLE, RELEVANCE], perPage: 12) {
+        edges {
+          role
+          node {
+            id
+            name {
+              full
+            }
+            image {
+              large
+            }
+          }
+          voiceActors(language: JAPANESE, sort: [RELEVANCE]) {
+            id
+            name {
+              full
+            }
+            image {
+              large
+            }
+          }
+        }
+      }
       externalLinks {
         id
         url
@@ -135,6 +161,33 @@ export const MEDIA_BY_ID_QUERY = gql`
         icon
         notes
         isDisabled
+      }
+    }
+  }
+`;
+
+/**
+ * A public user's full anime list, fetched by username (no auth — public
+ * profiles only). Powers "Import from AniList". `score(format: POINT_10)`
+ * normalizes to our 0–10 scale regardless of the user's chosen score format,
+ * and each `media` reuses MediaFields so it maps straight onto a TrackEntry.
+ * AniList returns one `lists` array per status (plus any custom lists), so a
+ * title can repeat across lists — the caller dedupes by media id.
+ */
+export const USER_LIST_QUERY = gql`
+  ${MEDIA_FIELDS}
+  query UserAnimeList($userName: String!) {
+    MediaListCollection(userName: $userName, type: ANIME) {
+      lists {
+        entries {
+          status
+          progress
+          score(format: POINT_10)
+          updatedAt
+          media {
+            ...MediaFields
+          }
+        }
       }
     }
   }
