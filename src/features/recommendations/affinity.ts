@@ -35,7 +35,7 @@ function scoreMultiplier(score: number): number {
 export function computeAffinity(entries: TrackEntry[]): Affinity {
   const weights: Record<string, number> = {};
   for (const e of entries) {
-    if (e.genres.length === 0) continue;
+    if (!e.genres || e.genres.length === 0) continue;
     const w = STATUS_WEIGHT[e.status] * scoreMultiplier(e.score);
     if (w === 0) continue;
     // Spread an entry's weight across its genres so a many-genre title doesn't
