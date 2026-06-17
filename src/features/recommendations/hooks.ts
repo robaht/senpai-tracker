@@ -19,6 +19,61 @@ export interface ForYouItem {
   becauseOf: string;
 }
 
+/** A title recommended by *both* blend inputs, with its taste match. */
+export interface BlendItem {
+  media: Media;
+  match: number | null;
+}
+
+/**
+ * "Blend" two titles: the anime that the recommendation graphs of *both* inputs
+ * point to — the sweet spot between two things the user loves. Ranks by the
+ * combined community rating, drops anything already tracked or dismissed, and
+ * attaches a taste match for display.
+ */
+export function useBlend(
+  idA: number | null,
+  idB: number | null,
+): { items: BlendItem[]; isLoading: boolean } {
+  const entries = useTrackingStore((s) => s.entries);
+  const dismissed = useDismissedStore((s) => s.ids);
+
+  const results = useQueries({
+    queries: [idA, idB].map((id) => ({
+      queryKey: animeKeys.recommendations(id ?? 0),
+      queryFn: () => getRecommendations(id as number),
+      enabled: !!id && id > 0,
+      staleTime: 60 * 60 * 1000,
+    })),
+  });
+
+  const list = useMemo(() => Object.values(entries), [entries]);
+  const affinity = useMemo(() => computeAffinity(list), [list]);
+  const tracked = useMemo(() => new Set(list.map((e) => e.mediaId)), [list]);
+
+  const items = useMemo<BlendItem[]>(() => {
+    const [ra, rb] = results;
+    if (!ra?.data || !rb?.data) return [];
+    const ratingB = new Map(rb.data.map((r) => [r.media.id, r.rating]));
+    const out: { media: Media; match: number | null; rating: number }[] = [];
+    for (const r of ra.data) {
+      const id = r.media.id;
+      if (!ratingB.has(id)) continue; // must be recommended by BOTH inputs
+      if (tracked.has(id) || dismissed.has(id) || id === idA || id === idB) continue;
+      out.push({
+        media: r.media,
+        match: matchScore(r.media, affinity).score,
+        rating: r.rating + (ratingB.get(id) ?? 0),
+      });
+    }
+    return out
+      .sort((a, b) => b.rating - a.rating)
+      .map(({ media, match }) => ({ media, match }));
+  }, [results, tracked, dismissed, affinity, idA, idB]);
+
+  return { items, isLoading: results.some((r) => r.isLoading && r.fetchStatus !== 'idle') };
+}
+
 /** Only titles the user actually engaged with seed recommendations. */
 const SOURCE_STATUS: Partial<Record<WatchStatus, number>> = {
   REPEATING: 2.5,

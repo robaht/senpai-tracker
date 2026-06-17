@@ -50,6 +50,31 @@ export default function ForYouScreen() {
             </Text>
           </Pressable>
         </View>
+
+        <View style={styles.modeRow}>
+          <Pressable
+            onPress={() => router.push('/roulette')}
+            style={[styles.modeBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            accessibilityRole="button"
+            accessibilityLabel="Surprise me"
+          >
+            <Ionicons name="dice" size={16} color={colors.accent} />
+            <Text variant="caption" color="text">
+              Surprise me
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => router.push('/blend')}
+            style={[styles.modeBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            accessibilityRole="button"
+            accessibilityLabel="Blend two titles"
+          >
+            <Ionicons name="git-merge" size={16} color={colors.accent} />
+            <Text variant="caption" color="text">
+              Blend
+            </Text>
+          </Pressable>
+        </View>
       </View>
 
       <Animated.FlatList
@@ -127,6 +152,20 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
     borderRadius: radii.pill,
+  },
+  modeRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  modeBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    paddingVertical: spacing.md,
+    borderRadius: radii.md,
+    borderWidth: StyleSheet.hairlineWidth,
   },
   iconBtn: {
     width: 40,

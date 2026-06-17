@@ -174,7 +174,7 @@ export const MEDIA_BY_ID_QUERY = gql`
  */
 export const RECOMMENDATIONS_QUERY = gql`
   ${MEDIA_FIELDS}
-  query Recommendations($id: Int!, $perPage: Int = 16) {
+  query Recommendations($id: Int!, $perPage: Int = 28) {
     Media(id: $id, type: ANIME) {
       id
       recommendations(sort: RATING_DESC, perPage: $perPage) {
