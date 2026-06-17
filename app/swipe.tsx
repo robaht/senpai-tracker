@@ -38,7 +38,7 @@ export default function SwipeScreen() {
         <View>
           <Text variant="display">Swipe</Text>
           <Text variant="caption" color="textMuted">
-            Right to add · left to skip
+            Swipe to decide · tap for details
           </Text>
         </View>
       </View>

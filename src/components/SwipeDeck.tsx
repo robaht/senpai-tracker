@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { View, StyleSheet, useWindowDimensions, Pressable } from 'react-native';
+import { useRouter } from 'expo-router';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -36,6 +37,7 @@ interface SwipeDeckProps {
 export function SwipeDeck({ items, onLike, onNope }: SwipeDeckProps) {
   const { width } = useWindowDimensions();
   const { colors } = useTheme();
+  const router = useRouter();
   const [index, setIndex] = useState(0);
 
   const x = useSharedValue(0);
@@ -64,6 +66,11 @@ export function SwipeDeck({ items, onLike, onNope }: SwipeDeckProps) {
     });
   };
 
+  const openDetail = () => {
+    const item = items[index];
+    if (item) router.push(`/anime/${item.media.id}`);
+  };
+
   const pan = Gesture.Pan()
     .onUpdate((e) => {
       x.value = e.translationX;
@@ -78,6 +85,16 @@ export function SwipeDeck({ items, onLike, onNope }: SwipeDeckProps) {
         y.value = withSpring(0);
       }
     });
+
+  // A quick tap (no real drag) opens the detail screen; a drag swipes. Race so
+  // whichever the user actually does wins.
+  const tap = Gesture.Tap()
+    .maxDistance(10)
+    .onEnd((_e, success) => {
+      if (success) runOnJS(openDetail)();
+    });
+
+  const gesture = Gesture.Race(pan, tap);
 
   const topStyle = useAnimatedStyle(() => ({
     transform: [
@@ -125,7 +142,7 @@ export function SwipeDeck({ items, onLike, onNope }: SwipeDeckProps) {
           </Animated.View>
         )}
 
-        <GestureDetector gesture={pan}>
+        <GestureDetector gesture={gesture}>
           <Animated.View style={[styles.cardSlot, topStyle]}>
             <DeckCard item={current} colors={colors}>
               <Animated.View style={[styles.stamp, styles.stampLike, likeStyle]}>
