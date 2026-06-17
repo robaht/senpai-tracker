@@ -200,6 +200,16 @@ export interface ImportedListEntry {
   updatedAt: number;
 }
 
+/**
+ * One recommendation: a related title plus AniList's community rating (net
+ * up/down votes) for how good a suggestion it is. Powers "More like this" and
+ * the For You engine.
+ */
+export interface Recommendation {
+  media: Media;
+  rating: number;
+}
+
 /** Airing schedule row used by the weekly schedule screen. */
 export interface AiringScheduleItem {
   id: number;

@@ -10,6 +10,7 @@ import {
   getAiringSchedule,
   getAnimeById,
   getGenres,
+  getRecommendations,
   getSeasonal,
   getTrackedAiringSchedule,
   getTrending,
@@ -31,6 +32,7 @@ export const animeKeys = {
   browse: (filters: BrowseFilters) =>
     [...animeKeys.all, 'browse', [...filters.genres].sort(), filters.sort] as const,
   detail: (id: number) => [...animeKeys.all, 'detail', id] as const,
+  recommendations: (id: number) => [...animeKeys.all, 'recommendations', id] as const,
   airing: (from: number, to: number) => [...animeKeys.all, 'airing', from, to] as const,
   trackedAiring: (ids: number[], from: number, to: number) =>
     [...animeKeys.all, 'airing', 'tracked', ids, from, to] as const,
@@ -115,6 +117,16 @@ export function useSearchAnime(query: string) {
     getNextPageParam: nextPage,
     enabled: trimmed.length >= 2,
     placeholderData: keepPreviousData,
+  });
+}
+
+/** "More like this" — community-rated recommendations for a single title. */
+export function useSimilarTo(id: number) {
+  return useQuery({
+    queryKey: animeKeys.recommendations(id),
+    queryFn: () => getRecommendations(id),
+    enabled: Number.isFinite(id) && id > 0,
+    staleTime: 60 * 60 * 1000,
   });
 }
 

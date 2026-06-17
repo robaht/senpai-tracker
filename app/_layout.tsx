@@ -16,6 +16,7 @@ import { QueryProvider } from '../src/providers/QueryProvider';
 import { useTrackingStore } from '../src/features/tracking/store';
 import { useComfortStore } from '../src/features/comfort/store';
 import { usePreferencesStore } from '../src/features/preferences/store';
+import { useDismissedStore } from '../src/features/recommendations/store';
 import { ThemeProvider, useTheme } from '../src/theme';
 
 export default function RootLayout() {
@@ -31,12 +32,14 @@ export default function RootLayout() {
   const hydrateTracking = useTrackingStore((s) => s.hydrate);
   const hydrateComfort = useComfortStore((s) => s.hydrate);
   const hydratePrefs = usePreferencesStore((s) => s.hydrate);
+  const hydrateDismissed = useDismissedStore((s) => s.hydrate);
   const prefsHydrated = usePreferencesStore((s) => s.hydrated);
   useEffect(() => {
     void hydrateTracking();
     void hydrateComfort();
     void hydratePrefs();
-  }, [hydrateTracking, hydrateComfort, hydratePrefs]);
+    void hydrateDismissed();
+  }, [hydrateTracking, hydrateComfort, hydratePrefs, hydrateDismissed]);
 
   // Gate on prefs too, so a saved light theme doesn't flash the dark default.
   const ready = fontsLoaded && prefsHydrated;

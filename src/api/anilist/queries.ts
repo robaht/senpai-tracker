@@ -166,6 +166,29 @@ export const MEDIA_BY_ID_QUERY = gql`
   }
 `;
 
+/**
+ * Per-title recommendations — "More like this" + the For You engine. AniList
+ * ranks these by community rating; each `mediaRecommendation` reuses MediaFields
+ * so it drops straight onto a PosterCard. Nodes occasionally point at manga; the
+ * caller drops anything without anime-shaped fields.
+ */
+export const RECOMMENDATIONS_QUERY = gql`
+  ${MEDIA_FIELDS}
+  query Recommendations($id: Int!, $perPage: Int = 16) {
+    Media(id: $id, type: ANIME) {
+      id
+      recommendations(sort: RATING_DESC, perPage: $perPage) {
+        nodes {
+          rating
+          mediaRecommendation {
+            ...MediaFields
+          }
+        }
+      }
+    }
+  }
+`;
+
 /** The full set of genres AniList recognizes — static, fetched once and cached. */
 export const GENRES_QUERY = gql`
   query Genres {

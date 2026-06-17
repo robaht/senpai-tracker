@@ -4,6 +4,7 @@ import {
   BROWSE_QUERY,
   GENRES_QUERY,
   MEDIA_BY_ID_QUERY,
+  RECOMMENDATIONS_QUERY,
   SEARCH_QUERY,
   SEASONAL_QUERY,
   TRACKED_AIRING_SCHEDULE_QUERY,
@@ -22,6 +23,7 @@ import type {
   MediaSeason,
   Page,
   PageInfo,
+  Recommendation,
 } from './types';
 
 export * from './types';
@@ -55,6 +57,28 @@ export async function getSeasonal(
     perPage,
   });
   return toPage(data.Page.pageInfo, data.Page.media);
+}
+
+interface RawRecommendation {
+  rating: number | null;
+  mediaRecommendation: Media | null;
+}
+
+/**
+ * Recommendations for a single title, highest community-rated first. Drops
+ * empty nodes and any without a cover (a cheap proxy for "not a real anime
+ * entry"), so callers get clean, renderable Media.
+ */
+export async function getRecommendations(id: number): Promise<Recommendation[]> {
+  const data = await anilistRequest<{
+    Media: { recommendations: { nodes: RawRecommendation[] } | null } | null;
+  }>(RECOMMENDATIONS_QUERY, { id });
+  const nodes = data.Media?.recommendations?.nodes ?? [];
+  return nodes
+    .filter((n): n is RawRecommendation & { mediaRecommendation: Media } =>
+      Boolean(n.mediaRecommendation?.coverImage),
+    )
+    .map((n) => ({ media: n.mediaRecommendation, rating: n.rating ?? 0 }));
 }
 
 /** The full list of AniList genres, alphabetical as returned by the API. */

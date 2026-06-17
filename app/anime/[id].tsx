@@ -27,6 +27,7 @@ import { CountdownPill } from '../../src/components/CountdownPill';
 import { AddToListSheet } from '../../src/components/AddToListSheet';
 import { EmptyState } from '../../src/components/EmptyState';
 import { RelationsRail } from '../../src/components/RelationsRail';
+import { RecommendationsRail } from '../../src/components/RecommendationsRail';
 import { CharacterRail } from '../../src/components/CharacterRail';
 import { TrailerCard } from '../../src/components/TrailerCard';
 import { StreamingLinks } from '../../src/components/StreamingLinks';
@@ -256,6 +257,9 @@ export default function AnimeDetailScreen() {
 
             {/* Related anime / season chain */}
             <RelationsRail media={media} />
+
+            {/* "More like this" — community recommendations */}
+            <RecommendationsRail mediaId={media.id} />
           </View>
         )}
       </Animated.ScrollView>
