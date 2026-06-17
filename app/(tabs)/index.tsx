@@ -28,7 +28,7 @@ import { PosterCard } from '../../src/components/PosterCard';
 import { EmptyState } from '../../src/components/EmptyState';
 import { useSeasonal, useTrending, useSearchAnime, flattenPages } from '../../src/api/anilist/hooks';
 import { currentSeason, type Media } from '../../src/api/anilist';
-import { spacing, useTheme } from '../../src/theme';
+import { radii, spacing, useTheme } from '../../src/theme';
 
 const H_PADDING = spacing.xl;
 const COL_GAP = spacing.md;
@@ -144,6 +144,35 @@ export default function DiscoverScreen() {
             </Animated.View>
 
             <SearchBar value={query} onChangeText={setQuery} />
+
+            {!isSearching && (
+              <PressableScale
+                onPress={() => router.push('/for-you')}
+                accessibilityRole="button"
+                accessibilityLabel="For You recommendations"
+                style={styles.forYouBanner}
+              >
+                <LinearGradient
+                  colors={gradients.brand}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.forYouGradient}
+                >
+                  <View style={styles.forYouIcon}>
+                    <Ionicons name="sparkles" size={20} color={colors.onMedia} />
+                  </View>
+                  <View style={styles.forYouText}>
+                    <Text variant="callout" color={colors.onMedia}>
+                      For You
+                    </Text>
+                    <Text variant="caption" color={colors.onMediaMuted}>
+                      Recommendations picked from your list
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={18} color={colors.onMedia} />
+                </LinearGradient>
+              </PressableScale>
+            )}
 
             {!isSearching && (
               <View style={styles.trendingBlock}>
@@ -319,6 +348,28 @@ const styles = StyleSheet.create({
   },
   trendingBlock: {
     gap: 0,
+  },
+  forYouBanner: {
+    marginTop: spacing.lg,
+  },
+  forYouGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    padding: spacing.md,
+    borderRadius: radii.lg,
+  },
+  forYouIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.18)',
+  },
+  forYouText: {
+    flex: 1,
+    gap: 2,
   },
   carousel: {
     gap: COL_GAP,
