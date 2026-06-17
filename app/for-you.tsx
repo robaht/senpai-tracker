@@ -8,7 +8,7 @@ import { Skeleton } from '../src/components/ui/Skeleton';
 import { MatchCard } from '../src/components/MatchCard';
 import { useForYou, type ForYouItem } from '../src/features/recommendations/hooks';
 import { useDismissedStore } from '../src/features/recommendations/store';
-import { spacing, useTheme } from '../src/theme';
+import { radii, spacing, useTheme } from '../src/theme';
 
 const H_PADDING = spacing.xl;
 const BOTTOM_SPACE = 110;
@@ -32,12 +32,23 @@ export default function ForYouScreen() {
           >
             <Ionicons name="chevron-back" size={22} color={colors.text} />
           </Pressable>
-          <View>
+          <View style={styles.titleBlock}>
             <Text variant="display">For You</Text>
             <Text variant="caption" color="textMuted">
               Picked from what you love
             </Text>
           </View>
+          <Pressable
+            onPress={() => router.push('/swipe')}
+            style={[styles.swipeBtn, { backgroundColor: colors.accent }]}
+            accessibilityRole="button"
+            accessibilityLabel="Swipe through picks"
+          >
+            <Ionicons name="layers" size={16} color={colors.onMedia} />
+            <Text variant="caption" color={colors.onMedia}>
+              Swipe
+            </Text>
+          </Pressable>
         </View>
       </View>
 
@@ -105,6 +116,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
+  },
+  titleBlock: {
+    flex: 1,
+  },
+  swipeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: radii.pill,
   },
   iconBtn: {
     width: 40,
