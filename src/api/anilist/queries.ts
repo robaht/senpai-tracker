@@ -166,6 +166,35 @@ export const MEDIA_BY_ID_QUERY = gql`
   }
 `;
 
+/** The full set of genres AniList recognizes — static, fetched once and cached. */
+export const GENRES_QUERY = gql`
+  query Genres {
+    GenreCollection
+  }
+`;
+
+/**
+ * Browse by genre with a chosen sort — powers the Genre browse screen.
+ * `genre_in` ANDs the supplied genres; omitting it (empty list) browses all.
+ */
+export const BROWSE_QUERY = gql`
+  ${MEDIA_FIELDS}
+  query Browse($genres: [String], $sort: [MediaSort], $page: Int = 1, $perPage: Int = 24) {
+    Page(page: $page, perPage: $perPage) {
+      pageInfo {
+        hasNextPage
+        currentPage
+        lastPage
+        total
+        perPage
+      }
+      media(genre_in: $genres, sort: $sort, type: ANIME, isAdult: false) {
+        ...MediaFields
+      }
+    }
+  }
+`;
+
 /**
  * A public user's full anime list, fetched by username (no auth — public
  * profiles only). Powers "Import from AniList". `score(format: POINT_10)`

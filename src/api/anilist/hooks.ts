@@ -5,15 +5,17 @@ import {
   type InfiniteData,
 } from '@tanstack/react-query';
 import {
+  browse,
   currentSeason,
   getAiringSchedule,
   getAnimeById,
+  getGenres,
   getSeasonal,
   getTrackedAiringSchedule,
   getTrending,
   searchAnime,
 } from './index';
-import type { MediaSeason, Page } from './types';
+import type { BrowseFilters, MediaSeason, Page } from './types';
 
 /**
  * Centralized query keys. Anything that reads or invalidates AniList data
@@ -25,6 +27,9 @@ export const animeKeys = {
   seasonal: (season: string, year: number) =>
     [...animeKeys.all, 'seasonal', season, year] as const,
   search: (q: string) => [...animeKeys.all, 'search', q] as const,
+  genres: () => [...animeKeys.all, 'genres'] as const,
+  browse: (filters: BrowseFilters) =>
+    [...animeKeys.all, 'browse', [...filters.genres].sort(), filters.sort] as const,
   detail: (id: number) => [...animeKeys.all, 'detail', id] as const,
   airing: (from: number, to: number) => [...animeKeys.all, 'airing', from, to] as const,
   trackedAiring: (ids: number[], from: number, to: number) =>
@@ -79,6 +84,26 @@ export function useSeasonalBrowse(season: MediaSeason, year: number) {
 export function useSeasonal() {
   const { season, year } = currentSeason();
   return useSeasonalBrowse(season, year);
+}
+
+/** The static AniList genre list — cached aggressively since it rarely changes. */
+export function useGenres() {
+  return useQuery({
+    queryKey: animeKeys.genres(),
+    queryFn: getGenres,
+    staleTime: 24 * 60 * 60 * 1000,
+  });
+}
+
+/** Browse by genre + sort. Keeps the previous results visible while refiltering. */
+export function useBrowse(filters: BrowseFilters) {
+  return useInfiniteQuery({
+    queryKey: animeKeys.browse(filters),
+    queryFn: ({ pageParam }) => browse(filters, pageParam, 24),
+    initialPageParam: 1,
+    getNextPageParam: nextPage,
+    placeholderData: keepPreviousData,
+  });
 }
 
 export function useSearchAnime(query: string) {

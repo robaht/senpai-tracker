@@ -1,6 +1,8 @@
 import { anilistRequest } from './client';
 import {
   AIRING_SCHEDULE_QUERY,
+  BROWSE_QUERY,
+  GENRES_QUERY,
   MEDIA_BY_ID_QUERY,
   SEARCH_QUERY,
   SEASONAL_QUERY,
@@ -10,6 +12,7 @@ import {
 } from './queries';
 import type {
   AiringScheduleItem,
+  BrowseFilters,
   CharacterEdge,
   ExternalLink,
   ImportedListEntry,
@@ -48,6 +51,30 @@ export async function getSeasonal(
   const data = await anilistRequest<RawPage<{ media: Media[] }>>(SEASONAL_QUERY, {
     season,
     seasonYear,
+    page,
+    perPage,
+  });
+  return toPage(data.Page.pageInfo, data.Page.media);
+}
+
+/** The full list of AniList genres, alphabetical as returned by the API. */
+export async function getGenres(): Promise<string[]> {
+  const data = await anilistRequest<{ GenreCollection: string[] }>(GENRES_QUERY, {});
+  return data.GenreCollection ?? [];
+}
+
+/**
+ * Browse anime by genre + sort. An empty `genres` list browses everything for
+ * the chosen sort; supplied genres are ANDed (`genre_in`).
+ */
+export async function browse(
+  filters: BrowseFilters,
+  page = 1,
+  perPage = 24,
+): Promise<Page<Media>> {
+  const data = await anilistRequest<RawPage<{ media: Media[] }>>(BROWSE_QUERY, {
+    genres: filters.genres.length > 0 ? filters.genres : undefined,
+    sort: [filters.sort],
     page,
     perPage,
   });

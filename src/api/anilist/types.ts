@@ -25,6 +25,16 @@ export type MediaStatus =
 
 export type MediaSeason = 'WINTER' | 'SPRING' | 'SUMMER' | 'FALL';
 
+/** The subset of AniList's MediaSort we expose in the Browse screen. */
+export type MediaSort = 'POPULARITY_DESC' | 'SCORE_DESC' | 'TRENDING_DESC';
+
+/** Active filter state for the genre/tag Browse screen. */
+export interface BrowseFilters {
+  /** Genres to AND together (`genre_in`); empty means no genre constraint. */
+  genres: string[];
+  sort: MediaSort;
+}
+
 /**
  * How one Media connects to another. AniList relations form a graph (no
  * "season number"), so a linear S1→S2→S3 list is derived by walking

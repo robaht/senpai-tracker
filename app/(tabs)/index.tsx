@@ -166,17 +166,30 @@ export default function DiscoverScreen() {
                 caption={isSearching ? `“${query.trim()}”` : seasonLabel}
               />
               {!isSearching && (
-                <PressableScale
-                  onPress={() => router.push('/seasons')}
-                  accessibilityRole="button"
-                  accessibilityLabel="Browse seasons"
-                  style={styles.browseLink}
-                >
-                  <Text variant="caption" color={colors.accent}>
-                    Browse seasons
-                  </Text>
-                  <Ionicons name="chevron-forward" size={14} color={colors.accent} />
-                </PressableScale>
+                <View style={styles.browseLinks}>
+                  <PressableScale
+                    onPress={() => router.push('/seasons')}
+                    accessibilityRole="button"
+                    accessibilityLabel="Browse seasons"
+                    style={styles.browseLink}
+                  >
+                    <Text variant="caption" color={colors.accent}>
+                      Seasons
+                    </Text>
+                    <Ionicons name="chevron-forward" size={14} color={colors.accent} />
+                  </PressableScale>
+                  <PressableScale
+                    onPress={() => router.push('/browse')}
+                    accessibilityRole="button"
+                    accessibilityLabel="Browse genres"
+                    style={styles.browseLink}
+                  >
+                    <Text variant="caption" color={colors.accent}>
+                      Genres
+                    </Text>
+                    <Ionicons name="chevron-forward" size={14} color={colors.accent} />
+                  </PressableScale>
+                </View>
               )}
             </View>
           </View>
@@ -319,11 +332,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
+  browseLinks: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    marginBottom: spacing.md,
+  },
   browseLink: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 2,
-    marginBottom: spacing.md,
   },
   column: {
     gap: COL_GAP,
