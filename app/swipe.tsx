@@ -59,7 +59,7 @@ export default function SwipeScreen() {
             Nothing to swipe yet
           </Text>
           <Text variant="body" color="textMuted" style={styles.emptyBody}>
-            Mark a few anime as Watching or Completed first, then come back.
+            Add a few anime to your list first, then come back.
           </Text>
         </View>
       )}

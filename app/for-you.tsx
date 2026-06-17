@@ -104,7 +104,7 @@ export default function ForYouScreen() {
               <Text variant="body" color="textMuted" style={styles.emptyBody}>
                 {isError
                   ? 'Check your connection and try again.'
-                  : 'Mark a few anime as Watching or Completed — and rate the ones you love — and your recommendations will appear here.'}
+                  : 'Add a few anime to your list — and rate the ones you love — and your recommendations will appear here.'}
               </Text>
             </View>
           )

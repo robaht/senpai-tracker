@@ -74,11 +74,18 @@ export function useBlend(
   return { items, isLoading: results.some((r) => r.isLoading && r.fetchStatus !== 'idle') };
 }
 
-/** Only titles the user actually engaged with seed recommendations. */
+/**
+ * How strongly each status seeds recommendations. Titles you've watched lead,
+ * but Plan-to-Watch and On-hold still count — they're a real taste signal, and
+ * excluding them left users with plan-to-watch-heavy lists seeing nothing.
+ * Dropped is deliberately omitted (it's a negative signal handled in affinity).
+ */
 const SOURCE_STATUS: Partial<Record<WatchStatus, number>> = {
   REPEATING: 2.5,
   COMPLETED: 2,
   CURRENT: 1.5,
+  PAUSED: 1,
+  PLANNING: 1,
 };
 
 /** How much a tracked title should drive recommendations. */
