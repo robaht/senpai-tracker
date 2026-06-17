@@ -16,18 +16,19 @@ so any one can be picked up cold and started smoothly.
 |----|---------|----------|--------|------------|
 | F1 | User accounts & cloud sync | P1 | L | — |
 | F3 | New-season alerts for watched anime + Upcoming screen | P2 | M–L | Notif. infra, (F1 for true push) |
-| F5 | Recommender ("similar to X" / for you) | P2 | M | — |
 | F7 | Deep multi-hop season chain (full S1→S2→S3 ordering) | P3 | M | — (extends shipped F2) |
 | F8 | Super Follow (per-title new-season announcement alerts) | P2 | M | Notif. infra, F1 (true push) |
-| F18 | Genre / tag browse & filters | P2 | M | — (pairs with F4) |
+| F18 | Tag browse + genre × season composition (genre browse shipped) | P3 | S–M | — (extends shipped genre browse) |
 | F20 | Import list from MyAnimeList | P2 | M | — (shares shipped import/merge plumbing) |
 | F21 | Anime Wrapped (shareable year-in-review story) | P3 | M–L | shipped F14 (stat derivation); needs share/export plumbing |
+| F22 | Per-screen signature treatments & motion | P3 | M | — (builds on shipped theme/token system) |
 
 **Suggested build order** (fast value first, heavy infra last):
-`F21 → F18 → F5 → F1 → F3 → F7 → F8`.
+`F21 → F1 → F3 → F7 → F8 → F18`.
 Start with the shareable insights story (F21, building on shipped F14). The heavier
-discovery/infra items (F18/F5/F1/F3/F7/F8) come last. Reorder freely — entries
-are independent except where "Depends on" says otherwise.
+discovery/infra items (F1/F3/F7/F8) come next, with F18's small leftover (tags +
+season composition) as low-priority polish. Reorder freely — entries are
+independent except where "Depends on" says otherwise.
 
 ### Shared prerequisites (cross-cutting)
 - **Notifications infrastructure** (needed by F3): `expo-notifications` setup +
@@ -103,28 +104,6 @@ announced or starts airing, surface it (and optionally notify).
 - **Limitation:** true *announcement* push (notify the moment AniList adds a
   sequel, app closed) needs a server polling AniList → depends on **F1's backend**.
   Without it, detection happens on app open. Document this clearly.
-
----
-
-## F5 — Recommender ("similar to X" and "for you")
-
-**Goal:** Help users find their next watch from something they like.
-
-### Requirements / acceptance criteria
-- [ ] On a detail screen, a "More like this" rail of similar anime.
-- [ ] A "For you" view: recommendations aggregated from the user's liked/completed
-      list, excluding anime they already track.
-- [ ] Tapping a recommendation opens its detail.
-
-### Technical approach
-- AniList provides per-title recommendations: add
-  `recommendations(sort: RATING_DESC) { nodes { rating mediaRecommendation
-  { ...MediaFields } } }` to the detail query (or a dedicated query/hook).
-- Component `RecommendationsRail` on the detail screen.
-- "For you": fetch recommendations for the user's top liked/completed entries,
-  tally by frequency × rating, drop already-tracked ids, sort. Compute
-  client-side; cache via TanStack Query and cap fan-out to respect rate limits.
-- Later upgrade: genre/tag affinity scoring computed from the user's list.
 
 ---
 
@@ -223,27 +202,27 @@ the same detection plumbing and notification infra.
 
 ---
 
-## F18 — Genre / tag browse & filters
+## F18 — Tag browse + genre × season composition (remaining scope)
 
-**Goal:** Discovery beyond free-text search — browse by genre/tag with sorting.
+The core of F18 **shipped**: `app/browse.tsx` with genre multi-select, sort
+(Popularity/Score/Trending), one-tap reset, and an infinite `PosterCard` grid,
+backed by `BROWSE_QUERY` + `useBrowse`/`useGenres`. Two deferred pieces remain.
 
 ### Requirements / acceptance criteria
-- [ ] The user can browse anime filtered by one or more genres (and optionally tags).
-- [ ] Results can be sorted (e.g. Popularity, Score, Trending).
-- [ ] Filters compose with the shipped seasonal browser (F4) where it makes sense
-      (genre + season + year).
-- [ ] Clear active-filter display and a one-tap reset.
+- [ ] Browse/filter by AniList **tags**, not just genres. `tag_in` is already
+      supported server-side; the UX needs a searchable tag picker (there are
+      hundreds of tags, so a flat chip row like genres won't scale).
+- [ ] Compose the genre filters with the shipped seasonal browser (F4):
+      genre + season + year in one view.
 
 ### Technical approach
-- AniList's `Page.media` already supports `genre_in`, `tag_in`, and `sort` — add a
-  `BROWSE_QUERY` (or generalize `SEARCH_QUERY`) in `src/api/anilist/queries.ts`
-  plus a `browse(filters, page)` fn in `src/api/anilist/index.ts` and a
-  `useBrowse(filters)` hook in `src/api/anilist/hooks.ts` (genre list itself comes
-  from AniList's `GenreCollection`, fetched once + cached).
-- New screen `app/browse.tsx` (or fold into the shipped F4 seasons screen): a genre chip
-  multi-select + sort control, rendering the existing `PosterCard` grid.
-- Builds naturally on F16's infinite-scroll once that lands; cap fan-out for the
-  rate limit.
+- Extend the shipped `BrowseFilters` / `browse()` to carry `tags` and optional
+  `season`/`seasonYear`, threading them into `BROWSE_QUERY` (`tag_in`, `season`,
+  `seasonYear`).
+- Add a tag picker (search + recently-used) rather than rendering all tags; fetch
+  the tag list from AniList's `MediaTagCollection`, cached once like genres.
+- Either fold season/year controls into `app/browse.tsx` or let `app/seasons.tsx`
+  hand its season+year into the browse filters.
 
 ---
 
@@ -343,3 +322,64 @@ the same underlying stat derivation; F21 is the presentation/virality layer on t
 - **Limitation to document:** tracking has no true "watched-on" timestamp beyond
   `updatedAt`, so per-month/season attribution is approximate until richer history
   is stored — call this out in the "busiest period" card.
+
+---
+
+## F22 — Per-screen signature treatments & motion
+
+**Goal:** Give each major screen its own distinct, intentional visual identity
+and tasteful motion — so Discover, Library, Schedule, Detail, Stats, etc. each
+feel purpose-built rather than like one generic list reskinned — without breaking
+the shared token system or theme switching.
+
+### How this differs from existing work
+The shipped theme system (`src/theme/tokens.ts` + `ThemeContext`) already varies
+*palette* globally across themes. F22 is orthogonal: it varies *layout language and
+motion per screen* (within whatever theme is active), e.g. an editorial hero on
+Discover vs. a dense quiet grid on Library vs. a timeline rhythm on Schedule.
+F21's Wrapped is one-off story motion; F22 is the everyday in-app polish layer.
+
+### Requirements / acceptance criteria
+- [ ] Each of the core screens (`app/(tabs)/index.tsx` Discover, `library.tsx`,
+      `schedule.tsx`, `app/anime/[id].tsx` Detail, `app/stats.tsx`) has a documented,
+      deliberate visual treatment that differentiates it (hero/grid/timeline/etc.),
+      not just the same card list.
+- [ ] All treatments are built from the existing tokens (`spacing`, `radii`,
+      `typography`, `colors`, `gradients`) — no hard-coded hexes or magic numbers —
+      so every theme still looks coherent and live theme switching is unaffected.
+- [ ] Tasteful, consistent motion: shared screen-transition + list-item entrance +
+      press feedback, with a single reusable motion spec (durations/easings) rather
+      than ad-hoc per-component values.
+- [ ] Motion honors the OS "reduce motion" setting (`AccessibilityInfo`): animations
+      degrade to instant/opacity-only when reduce-motion is on.
+- [ ] No regression in scroll performance on the list-heavy screens (Library/Schedule).
+- [ ] Each design choice is captured briefly (a short note in the theme/docs) so the
+      per-screen intent is intentional and reviewable, not accidental.
+
+### Technical approach
+- **Motion tokens first:** extend `src/theme/tokens.ts` with a theme-invariant
+  `motion` block (durations + easing curves + standard spring config) so animation
+  values live in the token system like spacing/radii do. Add a `useReducedMotion()`
+  helper (wrapping `AccessibilityInfo.isReduceMotionEnabled` + the change event)
+  and gate every animation on it.
+- **Reusable primitives:** add a couple of small wrappers under `src/components/ui/`
+  — e.g. an `AnimatedScreen`/entrance fade-slide and a `Pressable` scale-on-press —
+  built on the already-installed `react-native-reanimated@4.2.1`, consumed by
+  screens so motion is consistent and centralized.
+- **Per-screen identity:** define each screen's signature treatment on top of the
+  existing component kit rather than forking it — e.g. promote `FeaturedCard` into a
+  parallax editorial hero on Discover, keep Library a calm token-spaced grid of
+  `PosterCard`/`LibraryRow`, give Schedule a timeline spine on `ScheduleRow`, and add
+  a collapsing/parallax header to `app/anime/[id].tsx`. Reuse `SectionHeader` and the
+  poster/row components so the variation is in layout + motion, not bespoke styling.
+- **Detail header & shared transition:** use expo-router's screen options and
+  reanimated scroll handlers in `app/anime/[id].tsx` for the collapsing header; apply
+  a single consistent stack transition in `app/_layout.tsx` / `(tabs)/_layout.tsx`.
+- **Scope guard:** this is a polish pass, not a redesign — land it screen-by-screen
+  behind the shared primitives so each screen can be reviewed and tuned independently,
+  and so a screen with no special treatment still works with the default motion.
+
+**Open question (worth a quick decision when we start):** how *divergent* should the
+screens be — subtle accents on a unified language (safer, more cohesive) vs. bold,
+genuinely distinct per-screen aesthetics (more striking, higher inconsistency risk)?
+Default to the cohesive end and dial up per screen.
