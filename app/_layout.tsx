@@ -79,6 +79,7 @@ function RootNavigator({ ready }: { ready: boolean }) {
         <Stack.Screen name="anime/[id]" options={{ animation: 'slide_from_bottom' }} />
         <Stack.Screen name="settings" options={{ animation: 'slide_from_bottom' }} />
         <Stack.Screen name="stats" options={{ animation: 'slide_from_bottom' }} />
+        <Stack.Screen name="wrapped" options={{ animation: 'fade' }} />
         <Stack.Screen name="comfort" options={{ animation: 'slide_from_bottom' }} />
         <Stack.Screen name="seasons" options={{ animation: 'slide_from_bottom' }} />
       </Stack>

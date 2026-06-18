@@ -20,12 +20,11 @@ so any one can be picked up cold and started smoothly.
 | F8 | Super Follow (per-title new-season announcement alerts) | P2 | M | Notif. infra, F1 (true push) |
 | F18 | Tag browse + genre × season composition (genre browse shipped) | P3 | S–M | — (extends shipped genre browse) |
 | F20 | Import list from MyAnimeList | P2 | M | — (shares shipped import/merge plumbing) |
-| F21 | Anime Wrapped (shareable year-in-review story) | P3 | M–L | shipped F14 (stat derivation); needs share/export plumbing |
 | F22 | Per-screen signature treatments & motion | P3 | M | — (builds on shipped theme/token system) |
 
 **Suggested build order** (fast value first, heavy infra last):
-`F21 → F1 → F3 → F7 → F8 → F18`.
-Start with the shareable insights story (F21, building on shipped F14). The heavier
+`F20 → F1 → F3 → F7 → F8 → F18`.
+Start with the MAL import (F20, reuses shipped import/merge plumbing). The heavier
 discovery/infra items (F1/F3/F7/F8) come next, with F18's small leftover (tags +
 season composition) as low-priority polish. Reorder freely — entries are
 independent except where "Depends on" says otherwise.
@@ -273,58 +272,6 @@ so switching trackers isn't a from-scratch re-entry.
 
 ---
 
-## F21 — Anime Wrapped (shareable year-in-review story)
-
-**Goal:** A swipeable, animated, shareable "year in anime" — Spotify-Wrapped-style
-— generated from the user's tracked list.
-
-### How this differs from F14
-F14 is an always-on **stats dashboard** you open to look things up. F21 is a
-seasonal, narrative, full-screen **story** you swipe through and share to social.
-F14 = reference; F21 = a moment built to be screenshotted and posted. They share
-the same underlying stat derivation; F21 is the presentation/virality layer on top.
-
-### Requirements / acceptance criteria
-- [ ] A full-screen, swipeable sequence of story cards (tap or swipe to advance),
-      each surfacing one headline stat with a bold visual treatment.
-- [ ] Cards cover the highlights: titles completed, episodes watched, estimated
-      hours, top genre(s), highest-rated title, busiest period, status breakdown.
-- [ ] A "personality"/standout card (e.g. your #1 by score, or most-binged title).
-- [ ] A final summary card is exportable as an image to the OS share sheet
-      (Instagram / X / etc.).
-- [ ] Scoped to a period (default: current year, year selectable) and computed
-      entirely from the local list — works offline.
-- [ ] Tasteful motion: cards animate in; honors the OS "reduce motion" setting.
-- [ ] Graceful with a sparse list (few entries): still yields a coherent story or
-      a friendly "not enough watched yet" state.
-
-### Technical approach
-- **Data (shared with F14):** derive everything from `useTrackingStore` entries
-  (`src/features/tracking/store.ts`), filtered to the period via
-  `TrackEntry.updatedAt`. Factor the math into a shared `computeStats(entries,
-  range)` helper so F14's dashboard and F21's story read from one source of truth.
-  Same snapshot caveat as F14 — the `TrackEntry` snapshot lacks `duration`/`genres`,
-  so hours and genre breakdown need either extending `snapshotFromMedia` going
-  forward or hydrating from the TanStack Query detail cache; document the estimate.
-- **Screen:** new `app/wrapped.tsx` as a full-screen modal route (expo-router),
-  pushed from the Library/Settings header and from F14's stats screen. A
-  horizontally-paged `FlatList` (or a `react-native-reanimated` pager) of
-  `WrappedCard`s, with a segmented progress bar on top and tap-to-advance + swipe.
-- **Motion:** `react-native-reanimated` for entrance/parallax; gate it on
-  `AccessibilityInfo.isReduceMotionEnabled` for the reduce-motion path.
-- **Share/export:** capture a card to an image with `react-native-view-shot`
-  (`captureRef`), then share via `expo-sharing` + `expo-file-system`. This share
-  plumbing is **net-new** — the shipped AniList import only *reads* a list, so no
-  file-export/share path exists yet. Use a dedicated share-card layout (9:16 /
-  square) distinct from the on-screen card so exports look intentional.
-- **Visuals:** hand-rolled `View`s + gradients on the existing token system (no
-  charting dep), reusing `statusColor`, `SectionHeader`, and `Card`, matching F14.
-- **Limitation to document:** tracking has no true "watched-on" timestamp beyond
-  `updatedAt`, so per-month/season attribution is approximate until richer history
-  is stored — call this out in the "busiest period" card.
-
----
-
 ## F22 — Per-screen signature treatments & motion
 
 **Goal:** Give each major screen its own distinct, intentional visual identity
@@ -337,7 +284,7 @@ The shipped theme system (`src/theme/tokens.ts` + `ThemeContext`) already varies
 *palette* globally across themes. F22 is orthogonal: it varies *layout language and
 motion per screen* (within whatever theme is active), e.g. an editorial hero on
 Discover vs. a dense quiet grid on Library vs. a timeline rhythm on Schedule.
-F21's Wrapped is one-off story motion; F22 is the everyday in-app polish layer.
+The shipped Wrapped story is one-off story motion; F22 is the everyday in-app polish layer.
 
 ### Requirements / acceptance criteria
 - [ ] Each of the core screens (`app/(tabs)/index.tsx` Discover, `library.tsx`,

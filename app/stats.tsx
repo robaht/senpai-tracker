@@ -1,6 +1,8 @@
 import { ScrollView, View, Pressable, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { PressableScale } from '../src/components/ui/PressableScale';
 import { Screen } from '../src/components/ui/Screen';
 import { Text } from '../src/components/ui/Text';
 import { Card } from '../src/components/ui/Card';
@@ -14,7 +16,7 @@ import { radii, spacing, makeStyles, useTheme } from '../src/theme';
 
 export default function StatsScreen() {
   const router = useRouter();
-  const { colors } = useTheme();
+  const { colors, gradients } = useTheme();
   const styles = useStyles();
   const stats = useStats();
 
@@ -47,8 +49,37 @@ export default function StatsScreen() {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.content}
         >
+          {/* Wrapped entry */}
+          <PressableScale
+            onPress={() => router.push('/wrapped')}
+            accessibilityRole="button"
+            accessibilityLabel="Open your Anime Wrapped"
+          >
+            <LinearGradient
+              colors={gradients.brand}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.wrappedBanner}
+            >
+              <View style={styles.wrappedText}>
+                <Text variant="overline" color={colors.onMedia} style={styles.wrappedKicker}>
+                  NEW · {new Date().getFullYear()}
+                </Text>
+                <Text variant="heading" color={colors.onMedia}>
+                  Your Anime Wrapped
+                </Text>
+                <Text variant="caption" color={colors.onMediaMuted}>
+                  A swipeable, shareable year in review
+                </Text>
+              </View>
+              <View style={styles.wrappedPlay}>
+                <Ionicons name="play" size={22} color={colors.onMedia} />
+              </View>
+            </LinearGradient>
+          </PressableScale>
+
           {/* Hero totals */}
-          <View style={styles.tiles}>
+          <View style={[styles.tiles, styles.tilesSpaced]}>
             <StatTile value={fmt(stats.titles)} label={stats.titles === 1 ? 'Title' : 'Titles'} />
             <StatTile value={fmt(stats.episodes)} label="Episodes" />
             <StatTile
@@ -216,6 +247,24 @@ const useStyles = makeStyles(({ colors }) => ({
   tiles: {
     flexDirection: 'row',
     gap: spacing.md,
+  },
+  tilesSpaced: { marginTop: spacing.lg },
+  wrappedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    padding: spacing.lg,
+    borderRadius: radii.xl,
+  },
+  wrappedText: { flex: 1, gap: 2 },
+  wrappedKicker: { marginBottom: spacing.xs },
+  wrappedPlay: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.2)',
   },
   tile: {
     flex: 1,
