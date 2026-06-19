@@ -246,6 +246,24 @@ export const USER_LIST_QUERY = gql`
 `;
 
 /**
+ * Resolve a batch of *MyAnimeList* ids to AniList `Media` — powers "Import from
+ * MyAnimeList". MAL exports key entries by MAL id, but our tracking is keyed by
+ * AniList id; `idMal_in` lets AniList do the cross-walk in one request. Capped at
+ * 50 per page (AniList's max), so the caller chunks larger lists. Each `media`
+ * reuses MediaFields so it maps straight onto a TrackEntry.
+ */
+export const MEDIA_BY_MAL_IDS_QUERY = gql`
+  ${MEDIA_FIELDS}
+  query MediaByMalIds($malIds: [Int], $perPage: Int = 50) {
+    Page(page: 1, perPage: $perPage) {
+      media(idMal_in: $malIds, type: ANIME) {
+        ...MediaFields
+      }
+    }
+  }
+`;
+
+/**
  * Airing schedule within a unix-time window — powers the weekly schedule.
  * We sort ascending so the soonest episode is first.
  */

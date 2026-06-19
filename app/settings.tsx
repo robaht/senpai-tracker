@@ -17,6 +17,7 @@ import { Text } from '../src/components/ui/Text';
 import { Badge, withAlpha } from '../src/components/ui/Badge';
 import { PressableScale } from '../src/components/ui/PressableScale';
 import { ImportFromAniListSheet } from '../src/components/ImportFromAniListSheet';
+import { ImportFromMyAnimeListSheet } from '../src/components/ImportFromMyAnimeListSheet';
 import { usePreferencesStore, useRegion } from '../src/features/preferences/store';
 import { REGION_OPTIONS, regionLabel } from '../src/lib/streaming';
 import {
@@ -51,6 +52,7 @@ export default function SettingsScreen() {
   const resolvedRegion = useRegion();
 
   const [importOpen, setImportOpen] = useState(false);
+  const [malImportOpen, setMalImportOpen] = useState(false);
 
   const following = mode === 'system';
   const systemIsDark = scheme !== 'light'; // treat null as dark
@@ -95,6 +97,24 @@ export default function SettingsScreen() {
             <Text variant="bodyMedium">Import from AniList</Text>
             <Text variant="caption" color="textFaint">
               Bring in a public AniList user's list by username
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={colors.textFaint} />
+        </Pressable>
+
+        <Pressable
+          onPress={() => setMalImportOpen(true)}
+          style={[styles.row, styles.rowStacked, { backgroundColor: colors.surface, borderColor: colors.border }]}
+          accessibilityRole="button"
+          accessibilityLabel="Import from MyAnimeList"
+        >
+          <View style={[styles.rowIcon, { backgroundColor: withAlpha(colors.accent, 0.16) }]}>
+            <Ionicons name="document-text-outline" size={18} color={colors.accent} />
+          </View>
+          <View style={styles.rowText}>
+            <Text variant="bodyMedium">Import from MyAnimeList</Text>
+            <Text variant="caption" color="textFaint">
+              Bring in your MAL list from its XML export file
             </Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color={colors.textFaint} />
@@ -220,6 +240,7 @@ export default function SettingsScreen() {
       </ScrollView>
 
       <ImportFromAniListSheet visible={importOpen} onClose={() => setImportOpen(false)} />
+      <ImportFromMyAnimeListSheet visible={malImportOpen} onClose={() => setMalImportOpen(false)} />
     </Screen>
   );
 }
@@ -385,6 +406,9 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     borderRadius: radii.lg,
     borderWidth: StyleSheet.hairlineWidth,
+  },
+  rowStacked: {
+    marginTop: spacing.sm,
   },
   rowIcon: {
     width: 38,

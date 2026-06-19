@@ -19,15 +19,13 @@ so any one can be picked up cold and started smoothly.
 | F7 | Deep multi-hop season chain (full S1→S2→S3 ordering) | P3 | M | — (extends shipped F2) |
 | F8 | Super Follow (per-title new-season announcement alerts) | P2 | M | Notif. infra, F1 (true push) |
 | F18 | Tag browse + genre × season composition (genre browse shipped) | P3 | S–M | — (extends shipped genre browse) |
-| F20 | Import list from MyAnimeList | P2 | M | — (shares shipped import/merge plumbing) |
 | F22 | Per-screen signature treatments & motion | P3 | M | — (builds on shipped theme/token system) |
 
 **Suggested build order** (fast value first, heavy infra last):
-`F20 → F1 → F3 → F7 → F8 → F18`.
-Start with the MAL import (F20, reuses shipped import/merge plumbing). The heavier
-discovery/infra items (F1/F3/F7/F8) come next, with F18's small leftover (tags +
-season composition) as low-priority polish. Reorder freely — entries are
-independent except where "Depends on" says otherwise.
+`F1 → F3 → F7 → F8 → F18`.
+Start with the heavier discovery/infra items (F1/F3/F7/F8), with F18's small
+leftover (tags + season composition) as low-priority polish. Reorder freely —
+entries are independent except where "Depends on" says otherwise.
 
 ### Shared prerequisites (cross-cutting)
 - **Notifications infrastructure** (needed by F3): `expo-notifications` setup +
@@ -222,53 +220,6 @@ backed by `BROWSE_QUERY` + `useBrowse`/`useGenres`. Two deferred pieces remain.
   the tag list from AniList's `MediaTagCollection`, cached once like genres.
 - Either fold season/year controls into `app/browse.tsx` or let `app/seasons.tsx`
   hand its season+year into the browse filters.
-
----
-
-## F20 — Import list from MyAnimeList
-
-**Goal:** Let a MAL user bring their existing anime list into Senpai in one go,
-so switching trackers isn't a from-scratch re-entry.
-
-> **Is this legally OK?** Yes, via user-initiated paths: importing the user's own
-> MAL **XML export** (Profile → Export, a gzipped XML the user downloads), or
-> reading their list through MAL's **official OAuth2 API** with their consent.
-> Both are the user acting on their own data. What to avoid is scraping MAL's HTML
-> pages (against their ToS). Default to XML import — no API client, no auth, no
-> rate limits, and it's unambiguously the user's data.
-
-### Requirements / acceptance criteria
-- [ ] The user can import their MAL list (start with a MAL XML export file).
-- [ ] Imported entries map to the right Senpai status, episode progress, and score.
-- [ ] Entries resolve to the correct AniList title (so detail/relations/airing all
-      work afterward), and unresolved titles are reported rather than silently dropped.
-- [ ] Import merges with the existing list without clobbering newer local entries;
-      re-importing is idempotent (no duplicates).
-- [ ] Clear progress + summary ("imported 142, skipped 3") and it stays within
-      AniList's ~90 req/min limit.
-
-### Technical approach
-- **Parse:** accept a MAL XML export via `expo-document-picker`; read the `<anime>`
-  nodes — `series_animedb_id` (MAL id), `series_title`, `my_status`,
-  `my_watched_episodes`, `my_score` (already 0–10, same scale as `TrackEntry.score`).
-- **Map status** MAL → our `WatchStatus` (`src/features/tracking/types.ts`, which
-  mirrors AniList): Watching→`CURRENT`, Completed→`COMPLETED`, On-Hold→`PAUSED`,
-  Dropped→`DROPPED`, Plan to Watch→`PLANNING`.
-- **Resolve ids:** our tracking is keyed by *AniList* id, and `MEDIA_FIELDS` already
-  fetches `idMal`. AniList lets you query by MAL id — add a query/fn (e.g.
-  `Page(perPage: 50) { media(idMal_in: $malIds, type: ANIME) { ...MediaFields } }`)
-  in `src/api/anilist/queries.ts` / `index.ts`, batched in chunks of ~50 and cached
-  via TanStack Query to respect the rate limit. Build `TrackEntry`s from the
-  resolved `Media` (reusing the store's `snapshotFromMedia`).
-- **Merge:** reuse the **shipped** import/merge plumbing — `useTrackingStore.importFromList(list, mode)`
-  (last-write-wins by `updatedAt`, built for the AniList-username import) and the
-  repository's `replaceAll`. MAL import just needs to produce the same
-  `ImportedListEntry[]` shape and hand it to `importFromList`.
-- **UI:** an "Import from MyAnimeList" row in `app/settings.tsx` with a picker,
-  progress, and an unresolved-titles summary.
-- **Optional upgrade (later):** MAL official OAuth2 API for a no-file, live import
-  — heavier (register a client id + `expo-auth-session` flow), defer until the XML
-  path proves the mapping/merge.
 
 ---
 

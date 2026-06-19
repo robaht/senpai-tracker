@@ -4,6 +4,7 @@ import {
   BROWSE_QUERY,
   GENRES_QUERY,
   MEDIA_BY_ID_QUERY,
+  MEDIA_BY_MAL_IDS_QUERY,
   RECOMMENDATIONS_QUERY,
   SEARCH_QUERY,
   SEASONAL_QUERY,
@@ -207,6 +208,21 @@ export async function getUserAnimeList(userName: string): Promise<ImportedListEn
     }
   }
   return out;
+}
+
+/**
+ * Resolve MyAnimeList ids to AniList `Media`, one AniList page (≤50 ids) per
+ * call. The MAL import chunks its ids and calls this per chunk so it stays under
+ * AniList's ~90 req/min limit. Titles MAL knows but AniList doesn't simply don't
+ * come back — the caller diffs the returned `idMal`s to report what was skipped.
+ */
+export async function getMediaByMalIds(malIds: number[]): Promise<Media[]> {
+  if (malIds.length === 0) return [];
+  const data = await anilistRequest<{ Page: { media: Media[] } }>(MEDIA_BY_MAL_IDS_QUERY, {
+    malIds,
+    perPage: malIds.length,
+  });
+  return data.Page.media ?? [];
 }
 
 /** Returns the AniList season + year for a given date (defaults to now). */
