@@ -18,6 +18,7 @@ import { Badge, withAlpha } from '../src/components/ui/Badge';
 import { PressableScale } from '../src/components/ui/PressableScale';
 import { ImportFromAniListSheet } from '../src/components/ImportFromAniListSheet';
 import { ImportFromMyAnimeListSheet } from '../src/components/ImportFromMyAnimeListSheet';
+import { LibraryBackupSheet } from '../src/components/LibraryBackupSheet';
 import { usePreferencesStore, useRegion } from '../src/features/preferences/store';
 import { REGION_OPTIONS, regionLabel } from '../src/lib/streaming';
 import {
@@ -53,6 +54,7 @@ export default function SettingsScreen() {
 
   const [importOpen, setImportOpen] = useState(false);
   const [malImportOpen, setMalImportOpen] = useState(false);
+  const [backupOpen, setBackupOpen] = useState(false);
 
   const following = mode === 'system';
   const systemIsDark = scheme !== 'light'; // treat null as dark
@@ -115,6 +117,27 @@ export default function SettingsScreen() {
             <Text variant="bodyMedium">Import from MyAnimeList</Text>
             <Text variant="caption" color="textFaint">
               Bring in your MAL list from its XML export file
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={colors.textFaint} />
+        </Pressable>
+
+        <Text variant="overline" color="textFaint" style={styles.sectionLabel}>
+          DATA
+        </Text>
+        <Pressable
+          onPress={() => setBackupOpen(true)}
+          style={[styles.row, { backgroundColor: colors.surface, borderColor: colors.border }]}
+          accessibilityRole="button"
+          accessibilityLabel="Back up and restore your library"
+        >
+          <View style={[styles.rowIcon, { backgroundColor: withAlpha(colors.accent, 0.16) }]}>
+            <Ionicons name="save-outline" size={18} color={colors.accent} />
+          </View>
+          <View style={styles.rowText}>
+            <Text variant="bodyMedium">Back up & restore</Text>
+            <Text variant="caption" color="textFaint">
+              Export your library to a file, or restore it from one
             </Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color={colors.textFaint} />
@@ -241,6 +264,7 @@ export default function SettingsScreen() {
 
       <ImportFromAniListSheet visible={importOpen} onClose={() => setImportOpen(false)} />
       <ImportFromMyAnimeListSheet visible={malImportOpen} onClose={() => setMalImportOpen(false)} />
+      <LibraryBackupSheet visible={backupOpen} onClose={() => setBackupOpen(false)} />
     </Screen>
   );
 }

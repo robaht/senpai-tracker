@@ -38,6 +38,13 @@ interface TrackingState {
    * sync will use); `replace` swaps the whole list for the imported one.
    */
   importFromList: (list: ImportedListEntry[], mode: ImportMode) => ImportSummary;
+
+  /**
+   * Restore full `TrackEntry` rows from a local backup file. Unlike
+   * `importFromList`, these already carry their display snapshot, so no AniList
+   * resolution is needed — the same merge/replace + last-write-wins rules apply.
+   */
+  restoreEntries: (entries: TrackEntry[], mode: ImportMode) => ImportSummary;
 }
 
 function snapshotFromMedia(media: Media): Pick<
@@ -167,6 +174,35 @@ export const useTrackingStore = create<TrackingState>((set, get) => {
       set({ entries: next });
       void trackingRepository.replaceAll(Object.values(next));
       return { added, updated, unchanged, total: list.length };
+    },
+
+    restoreEntries: (entries, mode) => {
+      const current = get().entries;
+      const next: Record<number, TrackEntry> = mode === 'replace' ? {} : { ...current };
+      let added = 0;
+      let updated = 0;
+      let unchanged = 0;
+
+      for (const entry of entries) {
+        const existing = current[entry.mediaId];
+        if (mode === 'replace') {
+          next[entry.mediaId] = entry;
+          added += 1;
+        } else if (!existing) {
+          next[entry.mediaId] = entry;
+          added += 1;
+        } else if (entry.updatedAt > existing.updatedAt) {
+          // Keep the original createdAt so "date added" survives a restore.
+          next[entry.mediaId] = { ...entry, createdAt: existing.createdAt };
+          updated += 1;
+        } else {
+          unchanged += 1;
+        }
+      }
+
+      set({ entries: next });
+      void trackingRepository.replaceAll(Object.values(next));
+      return { added, updated, unchanged, total: entries.length };
     },
   };
 });
