@@ -23,14 +23,16 @@ Type-check anytime with `npm run typecheck`.
 ## Deploy to web
 
 The web build is a static site (`app.json` → `web.output: "static"`), so it can be
-hosted free on any static host. It's deployed to **Cloudflare Pages**, which
-auto-builds on every push to `master`:
+hosted free on any static host. It's deployed to **Cloudflare Workers (Static
+Assets)**, which auto-builds on every push to `master`. Config lives in
+[`wrangler.jsonc`](wrangler.jsonc) (serves `dist/`, with an SPA fallback so deep
+links to dynamic routes resolve):
 
 | Setting | Value |
 |---|---|
 | Build command | `npx expo export -p web` |
-| Build output directory | `dist` |
-| Node version | pinned via `.nvmrc` (20.19.4) |
+| Deploy command | `npx wrangler deploy` |
+| Node version | pinned via `.nvmrc` (22 — required by wrangler) |
 
 To build locally: `npx expo export -p web` → output in `dist/`.
 

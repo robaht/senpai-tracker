@@ -1,0 +1,13 @@
+{
+  "name": "senpai-tracker",
+  "compatibility_date": "2026-06-19",
+  // Static-assets-only Worker: serve the Expo web export from ./dist.
+  "assets": {
+    "directory": "./dist",
+    // Serve /browse from browse.html, etc.
+    "html_handling": "auto-trailing-slash",
+    // Deep links to dynamic routes (e.g. /anime/123) fall back to the
+    // app shell so the client router can render them.
+    "not_found_handling": "single-page-application"
+  }
+}
