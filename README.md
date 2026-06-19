@@ -20,6 +20,22 @@ Type-check anytime with `npm run typecheck`.
 
 > Node 20.19.4+ is recommended (some Expo build tooling warns on older 20.x).
 
+## Deploy to web
+
+The web build is a static site (`app.json` → `web.output: "static"`), so it can be
+hosted free on any static host. It's deployed to **Cloudflare Pages**, which
+auto-builds on every push to `master`:
+
+| Setting | Value |
+|---|---|
+| Build command | `npx expo export -p web` |
+| Build output directory | `dist` |
+| Node version | pinned via `.nvmrc` (20.19.4) |
+
+To build locally: `npx expo export -p web` → output in `dist/`.
+
+> Native-only features (push notifications, secure storage) are no-ops on web.
+
 ## Architecture
 
 Designed **local-first, sync-ready**: everything works offline on-device today,
