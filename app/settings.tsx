@@ -8,7 +8,7 @@ import {
   useWindowDimensions,
   useColorScheme,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useGoBack } from '../src/lib/useGoBack';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -33,7 +33,7 @@ import {
 const BOTTOM_SPACE = 60;
 
 export default function SettingsScreen() {
-  const router = useRouter();
+  const goBack = useGoBack();
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const scheme = useColorScheme();
@@ -68,7 +68,7 @@ export default function SettingsScreen() {
     <Screen>
       <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
         <Pressable
-          onPress={() => router.back()}
+          onPress={goBack}
           hitSlop={8}
           style={[styles.backBtn, { backgroundColor: colors.surfaceHigh }]}
           accessibilityRole="button"

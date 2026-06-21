@@ -1,5 +1,6 @@
 import { View, Pressable, StyleSheet, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useGoBack } from '../src/lib/useGoBack';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { Screen } from '../src/components/ui/Screen';
@@ -15,6 +16,7 @@ const BOTTOM_SPACE = 110;
 
 export default function ForYouScreen() {
   const router = useRouter();
+  const goBack = useGoBack();
   const { colors } = useTheme();
   const { items, isLoading, isError } = useForYou();
   const dismiss = useDismissedStore((s) => s.dismiss);
@@ -24,7 +26,7 @@ export default function ForYouScreen() {
       <View style={styles.header}>
         <View style={styles.topRow}>
           <Pressable
-            onPress={() => router.back()}
+            onPress={goBack}
             style={[styles.iconBtn, { backgroundColor: colors.surface }]}
             hitSlop={8}
             accessibilityRole="button"

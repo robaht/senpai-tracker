@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { View, Pressable, StyleSheet, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useGoBack } from '../src/lib/useGoBack';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -38,6 +39,7 @@ const pick = <T,>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
 export default function RouletteScreen() {
   const { width } = useWindowDimensions();
   const router = useRouter();
+  const goBack = useGoBack();
   const { colors, gradients } = useTheme();
   const { items } = useForYou();
 
@@ -91,7 +93,7 @@ export default function RouletteScreen() {
     <Screen>
       <View style={styles.header}>
         <Pressable
-          onPress={() => router.back()}
+          onPress={goBack}
           style={[styles.iconBtn, { backgroundColor: colors.surface }]}
           hitSlop={8}
           accessibilityRole="button"

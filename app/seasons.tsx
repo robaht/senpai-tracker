@@ -7,7 +7,7 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useGoBack } from '../src/lib/useGoBack';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { Screen } from '../src/components/ui/Screen';
@@ -34,7 +34,7 @@ const titleCase = (s: string) => s.charAt(0) + s.slice(1).toLowerCase();
 
 export default function SeasonsScreen() {
   const { width } = useWindowDimensions();
-  const router = useRouter();
+  const goBack = useGoBack();
   const { colors } = useTheme();
 
   const today = useMemo(() => currentSeason(), []);
@@ -61,7 +61,7 @@ export default function SeasonsScreen() {
       <View style={styles.header}>
         <View style={styles.topRow}>
           <Pressable
-            onPress={() => router.back()}
+            onPress={goBack}
             style={[styles.iconBtn, { backgroundColor: colors.surface }]}
             hitSlop={8}
             accessibilityRole="button"

@@ -1,5 +1,6 @@
 import { ScrollView, View, Pressable, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useGoBack } from '../src/lib/useGoBack';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { PressableScale } from '../src/components/ui/PressableScale';
@@ -16,6 +17,7 @@ import { radii, spacing, makeStyles, useTheme } from '../src/theme';
 
 export default function StatsScreen() {
   const router = useRouter();
+  const goBack = useGoBack();
   const { colors, gradients } = useTheme();
   const styles = useStyles();
   const stats = useStats();
@@ -27,7 +29,7 @@ export default function StatsScreen() {
     <Screen>
       <View style={styles.header}>
         <Pressable
-          onPress={() => router.back()}
+          onPress={goBack}
           style={[styles.backBtn, { backgroundColor: colors.surface }]}
           hitSlop={8}
           accessibilityRole="button"

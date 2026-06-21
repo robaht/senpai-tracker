@@ -8,7 +8,7 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useGoBack } from '../src/lib/useGoBack';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { Screen } from '../src/components/ui/Screen';
@@ -27,7 +27,7 @@ const BOTTOM_SPACE = 110;
 
 export default function BrowseScreen() {
   const { width } = useWindowDimensions();
-  const router = useRouter();
+  const goBack = useGoBack();
   const { colors } = useTheme();
 
   const [genres, setGenres] = useState<string[]>([]);
@@ -67,7 +67,7 @@ export default function BrowseScreen() {
       <View style={styles.header}>
         <View style={styles.topRow}>
           <Pressable
-            onPress={() => router.back()}
+            onPress={goBack}
             style={[styles.iconBtn, { backgroundColor: colors.surface }]}
             hitSlop={8}
             accessibilityRole="button"

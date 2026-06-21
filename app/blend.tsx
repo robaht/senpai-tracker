@@ -7,7 +7,7 @@ import {
   useWindowDimensions,
   ActivityIndicator,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useGoBack } from '../src/lib/useGoBack';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeIn } from 'react-native-reanimated';
@@ -31,7 +31,7 @@ function toSlot(e: TrackEntry): Slot {
 
 export default function BlendScreen() {
   const { width } = useWindowDimensions();
-  const router = useRouter();
+  const goBack = useGoBack();
   const { colors } = useTheme();
 
   const entries = useTrackingStore((s) => s.entries);
@@ -65,7 +65,7 @@ export default function BlendScreen() {
       <View style={styles.header}>
         <View style={styles.topRow}>
           <Pressable
-            onPress={() => (picking ? setPicking(null) : router.back())}
+            onPress={() => (picking ? setPicking(null) : goBack())}
             style={[styles.iconBtn, { backgroundColor: colors.surface }]}
             hitSlop={8}
             accessibilityRole="button"

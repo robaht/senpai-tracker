@@ -1,5 +1,6 @@
 import { View, FlatList, Pressable, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useGoBack } from '../src/lib/useGoBack';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
@@ -35,6 +36,7 @@ const COZY = {
 
 export default function ComfortScreen() {
   const router = useRouter();
+  const goBack = useGoBack();
   const picks = useComfortStore((s) => s.picks);
   const remove = useComfortStore((s) => s.remove);
 
@@ -62,7 +64,7 @@ export default function ComfortScreen() {
       <Screen style={styles.screen}>
         <View style={styles.header}>
           <Pressable
-            onPress={() => router.back()}
+            onPress={goBack}
             style={styles.backBtn}
             hitSlop={8}
             accessibilityRole="button"

@@ -5,7 +5,8 @@ import {
   Pressable,
   useWindowDimensions,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
+import { useGoBack } from '../../src/lib/useGoBack';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
@@ -43,7 +44,7 @@ import { radii, spacing, makeStyles, useTheme } from '../../src/theme';
 export default function AnimeDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const mediaId = Number(id);
-  const router = useRouter();
+  const goBack = useGoBack();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const { colors, isDark } = useTheme();
@@ -288,7 +289,7 @@ export default function AnimeDetailScreen() {
 
       {/* Floating back button */}
       <Pressable
-        onPress={() => router.back()}
+        onPress={goBack}
         style={[styles.backBtn, { backgroundColor: colors.mediaBorder, top: insets.top + spacing.sm }]}
         hitSlop={8}
         accessibilityRole="button"

@@ -1,6 +1,6 @@
 import { useRef } from 'react';
 import { View, Pressable, StyleSheet, ActivityIndicator } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useGoBack } from '../src/lib/useGoBack';
 import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '../src/components/ui/Screen';
 import { Text } from '../src/components/ui/Text';
@@ -11,7 +11,7 @@ import { useTrackingStore } from '../src/features/tracking/store';
 import { spacing, useTheme } from '../src/theme';
 
 export default function SwipeScreen() {
-  const router = useRouter();
+  const goBack = useGoBack();
   const { colors } = useTheme();
   const { items, isLoading } = useForYou();
   const track = useTrackingStore((s) => s.track);
@@ -27,7 +27,7 @@ export default function SwipeScreen() {
     <Screen>
       <View style={styles.header}>
         <Pressable
-          onPress={() => router.back()}
+          onPress={goBack}
           style={[styles.iconBtn, { backgroundColor: colors.surface }]}
           hitSlop={8}
           accessibilityRole="button"
