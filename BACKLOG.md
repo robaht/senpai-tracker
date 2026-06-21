@@ -21,7 +21,6 @@ so any one can be picked up cold and started smoothly.
 | F18 | Tag browse + genre × season composition (genre browse shipped) | P3 | S–M | — (extends shipped genre browse) |
 | F22 | Per-screen signature treatments & motion | P3 | M | — (builds on shipped theme/token system) |
 | F24 | Bug: tracking persistence race (read-modify-write data loss) | P2 | S–M | — |
-| F25 | Test harness for core logic (zero tests today) | P2 | M | — |
 | F26 | Network resilience — AniList 429/Retry-After + request timeout | P3 | S–M | — |
 | F27 | Web runtime robustness — ErrorBoundary, bounded cache persistence, sheet a11y | P3 | M | — |
 
@@ -327,33 +326,6 @@ state on each change, which is inherently race-free.
   write.
 - Either way, fold this into **F1**'s sync engine design (last-write-wins by
   `updatedAt` already exists on `TrackEntry`).
-
----
-
-## F25 — Test harness for core logic
-
-**Goal:** Lock down the pure, high-value logic with automated tests — the app
-currently ships with **zero** tests, so refactors and the heavier upcoming
-features (F1 sync, F7 traversal) have no safety net.
-
-### Requirements / acceptance criteria
-- [ ] A test runner is wired up (`jest-expo` or `vitest`) with an `npm test` script.
-- [ ] Coverage for the pure logic that's easy to break and expensive to debug:
-      - `src/lib/libraryBackup.ts` — XML round-trip + corrupt-input guards.
-      - `src/features/tracking/store.ts` — `importFromList` / `restoreEntries`
-        merge vs. replace, last-write-wins, `createdAt` preservation.
-      - `src/lib/malImport.ts` — `parseMalXml` (status map, CDATA, dedupe).
-      - `src/features/recommendations/affinity.ts` — `computeAffinity` / `matchScore`.
-      - `src/lib/relations.ts`, `src/lib/streaming.ts`, `currentSeason`/`prev`/`next`.
-- [ ] Runs in CI (e.g. a GitHub Action) so every push to `master` is checked
-      before Cloudflare deploys.
-
-### Technical approach
-- These modules are already pure and dependency-light (the reason they're the
-  right first targets). `jest-expo` is the path-of-least-resistance preset for
-  Expo SDK 55; add `__tests__/` next to each module or a top-level `tests/` dir.
-- Add a `test` + `test:watch` script; gate the Cloudflare build's `master`
-  pushes on it via a GitHub Action (the repo already auto-deploys from `master`).
 
 ---
 
