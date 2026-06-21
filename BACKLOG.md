@@ -20,6 +20,10 @@ so any one can be picked up cold and started smoothly.
 | F8 | Super Follow (per-title new-season announcement alerts) | P2 | M | Notif. infra, F1 (true push) |
 | F18 | Tag browse + genre × season composition (genre browse shipped) | P3 | S–M | — (extends shipped genre browse) |
 | F22 | Per-screen signature treatments & motion | P3 | M | — (builds on shipped theme/token system) |
+| F24 | Bug: tracking persistence race (read-modify-write data loss) | P2 | S–M | — |
+| F25 | Test harness for core logic (zero tests today) | P2 | M | — |
+| F26 | Network resilience — AniList 429/Retry-After + request timeout | P3 | S–M | — |
+| F27 | Web runtime robustness — ErrorBoundary, bounded cache persistence, sheet a11y | P3 | M | — |
 
 **Suggested build order** (fast value first, heavy infra last):
 `F1 → F3 → F7 → F8 → F18`.
@@ -281,3 +285,125 @@ The shipped Wrapped story is one-off story motion; F22 is the everyday in-app po
 screens be — subtle accents on a unified language (safer, more cohesive) vs. bold,
 genuinely distinct per-screen aesthetics (more striking, higher inconsistency risk)?
 Default to the cohesive end and dial up per screen.
+
+---
+
+## F24 — Bug: tracking persistence race (read-modify-write data loss)
+
+**Goal:** Concurrent edits to the tracked list must never silently lose data on
+reload.
+
+### The bug
+`AsyncStorageTrackingRepository.upsert()` / `remove()`
+(`src/features/tracking/repository.ts`) do a **read-modify-write** on a single
+JSON blob: `readMap()` → mutate one key → `writeMap()`. The store fires these
+**fire-and-forget** on every mutation (`track`, `untrack`, `setStatus`,
+`setProgress`, `incrementProgress`, `setScore` in `src/features/tracking/store.ts`).
+Two mutations to *different* titles close together can interleave — both read the
+same old map, then each writes back its own copy — so the second write clobbers
+the first title's change. The in-memory store looks correct until the next
+`hydrate()` (app reload), when the lost write is gone. AniList catalog data is
+safe (it's in the query cache); this is specifically the user's own list.
+
+This is the **only** repository with the bug: `comfort`, `preferences`, and
+`recommendations` (dismissed) all persist the **whole snapshot** from in-memory
+state on each change, which is inherently race-free.
+
+### Requirements / acceptance criteria
+- [ ] Rapid successive edits to different titles all survive an app reload.
+- [ ] No regression to the offline-first, instant-UI behavior (persistence stays
+      off the render path).
+- [ ] The fix is contained to the tracking layer (repository/store), per the
+      repository seam.
+
+### Technical approach
+- Preferred: make tracking persist like the other stores — have the store write
+  the **entire entries map** (which it already holds in memory) via a single
+  `replaceAll`-style call per mutation, dropping granular `upsert`/`remove`
+  read-modify-write. Lists are "hundreds of entries" max, so a full
+  `JSON.stringify` per change is cheap and matches the existing pattern.
+- Alternative if granular writes are kept: serialize repository operations behind
+  an internal promise-chain mutex so a read can't interleave with another op's
+  write.
+- Either way, fold this into **F1**'s sync engine design (last-write-wins by
+  `updatedAt` already exists on `TrackEntry`).
+
+---
+
+## F25 — Test harness for core logic
+
+**Goal:** Lock down the pure, high-value logic with automated tests — the app
+currently ships with **zero** tests, so refactors and the heavier upcoming
+features (F1 sync, F7 traversal) have no safety net.
+
+### Requirements / acceptance criteria
+- [ ] A test runner is wired up (`jest-expo` or `vitest`) with an `npm test` script.
+- [ ] Coverage for the pure logic that's easy to break and expensive to debug:
+      - `src/lib/libraryBackup.ts` — XML round-trip + corrupt-input guards.
+      - `src/features/tracking/store.ts` — `importFromList` / `restoreEntries`
+        merge vs. replace, last-write-wins, `createdAt` preservation.
+      - `src/lib/malImport.ts` — `parseMalXml` (status map, CDATA, dedupe).
+      - `src/features/recommendations/affinity.ts` — `computeAffinity` / `matchScore`.
+      - `src/lib/relations.ts`, `src/lib/streaming.ts`, `currentSeason`/`prev`/`next`.
+- [ ] Runs in CI (e.g. a GitHub Action) so every push to `master` is checked
+      before Cloudflare deploys.
+
+### Technical approach
+- These modules are already pure and dependency-light (the reason they're the
+  right first targets). `jest-expo` is the path-of-least-resistance preset for
+  Expo SDK 55; add `__tests__/` next to each module or a top-level `tests/` dir.
+- Add a `test` + `test:watch` script; gate the Cloudflare build's `master`
+  pushes on it via a GitHub Action (the repo already auto-deploys from `master`).
+
+---
+
+## F26 — Network resilience: AniList 429 / Retry-After + request timeout
+
+**Goal:** Degrade gracefully when AniList rate-limits or hangs, instead of blind
+retries and indefinitely-pending requests.
+
+### The gap
+`src/api/anilist/client.ts` documents "retry-after handling on 429" as a future
+concern but doesn't implement it; the global TanStack config
+(`src/providers/QueryProvider.tsx`) uses `retry: 2`, which **retries a 429
+immediately** and can deepen the rate-limit hole. There's also no request
+timeout — a stalled fetch stays pending forever.
+
+### Requirements / acceptance criteria
+- [ ] On HTTP 429, honor the `Retry-After` header (back off, don't hammer).
+- [ ] Don't retry non-retriable errors (e.g. 404 from a bad username/id).
+- [ ] Requests time out and surface a clean error rather than hanging.
+- [ ] Behavior is centralized so all queries inherit it.
+
+### Technical approach
+- Add 429/`Retry-After` handling and an `AbortController` timeout in
+  `anilistRequest` (`client.ts`) — the existing single choke point for all reads.
+- Replace the blanket `retry: 2` with a function that skips 4xx (except 429) and
+  defers to the backoff for 429.
+
+---
+
+## F27 — Web runtime robustness (ErrorBoundary, bounded cache persistence, sheet a11y)
+
+**Goal:** Harden the deployed web build against whole-app crashes, storage-quota
+failures, and a couple of web-only UX gaps.
+
+### Requirements / acceptance criteria
+- [ ] A render error in one screen shows a recoverable fallback (with a reload/back
+      action) instead of white-screening the whole app — there's no `ErrorBoundary`
+      today, so any uncaught render throw kills everything.
+- [ ] The persisted TanStack query cache can't blow the browser's localStorage
+      quota: today `PersistQueryClientProvider` dehydrates **all** queries
+      (`QueryProvider.tsx`), including every infinite list + covers, to
+      AsyncStorage→localStorage (~5 MB on web). A quota write failure should not
+      break the app, and large/low-value queries shouldn't be persisted.
+- [ ] `BottomSheet` (`src/components/ui/BottomSheet.tsx`) closes on `Escape` and
+      restores focus on web (native `Modal.onRequestClose` doesn't fire for web Esc).
+
+### Technical approach
+- Add a root `ErrorBoundary` in `app/_layout.tsx` (class component or
+  `react-error-boundary`) wrapping the navigator, themed via tokens.
+- Add a `dehydrateOptions.shouldDehydrateQuery` filter (and/or `maxAge`/size cap)
+  to the persister so only small, high-value queries persist; wrap the persist
+  restore so a quota error degrades to in-memory-only.
+- In `BottomSheet`, add a web-only `keydown` Escape listener while open.

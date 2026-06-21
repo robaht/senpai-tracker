@@ -40,6 +40,13 @@ function field(block: string, tag: string): string {
 
 const orNull = (value: string): string | null => (value ? value : null);
 
+/** Parse an optional integer field, guarding against NaN from a corrupt file. */
+function intOrNull(raw: string): number | null {
+  if (!raw) return null;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
+}
+
 /** Serialize the full library to a Senpai backup XML document. */
 export function entriesToXml(entries: TrackEntry[]): string {
   const lines = [
@@ -84,8 +91,6 @@ export function parseLibraryXml(xml: string): TrackEntry[] {
     const status = field(block, 'status') as WatchStatus;
     if (!mediaId || !WATCH_STATUSES.includes(status)) continue;
 
-    const totalRaw = field(block, 'totalEpisodes');
-    const durationRaw = field(block, 'duration');
     const genres = [...block.matchAll(/<genre>([\s\S]*?)<\/genre>/g)]
       .map((m) => unesc(m[1].trim()))
       .filter(Boolean);
@@ -96,13 +101,13 @@ export function parseLibraryXml(xml: string): TrackEntry[] {
       mediaId,
       status,
       progress: Math.max(0, Number(field(block, 'progress')) || 0),
-      totalEpisodes: totalRaw ? Number(totalRaw) : null,
+      totalEpisodes: intOrNull(field(block, 'totalEpisodes')),
       score: Math.max(0, Math.min(Number(field(block, 'score')) || 0, 10)),
       title: unesc(field(block, 'title')),
       coverImage: orNull(unesc(field(block, 'coverImage'))),
       coverColor: orNull(unesc(field(block, 'coverColor'))),
       format: orNull(unesc(field(block, 'format'))),
-      duration: durationRaw ? Number(durationRaw) : null,
+      duration: intOrNull(field(block, 'duration')),
       genres,
       updatedAt,
       createdAt,
