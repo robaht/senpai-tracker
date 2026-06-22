@@ -5,8 +5,8 @@ import {
   Pressable,
   useWindowDimensions,
 } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
-import { useGoBack } from '../../src/lib/useGoBack';
+import { useLocalSearchParams, useNavigation } from 'expo-router';
+import { useGoBack, useGoHome } from '../../src/lib/useGoBack';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
@@ -45,6 +45,12 @@ export default function AnimeDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const mediaId = Number(id);
   const goBack = useGoBack();
+  const goHome = useGoHome();
+  const navigation = useNavigation();
+  // Show the "home" shortcut only once a chain has built up (more than one detail
+  // screen pushed over the tabs) — a single-level detail is one back-tap from home.
+  const stackDepth = navigation.getState()?.routes.length ?? 1;
+  const showHome = stackDepth > 2;
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const { colors, isDark } = useTheme();
@@ -298,6 +304,19 @@ export default function AnimeDetailScreen() {
         <Ionicons name="chevron-back" size={24} color={colors.onMedia} />
       </Pressable>
 
+      {/* Floating home button — collapses a deep anime→anime chain in one tap */}
+      {showHome && (
+        <Pressable
+          onPress={goHome}
+          style={[styles.homeBtn, { backgroundColor: colors.mediaBorder, top: insets.top + spacing.sm }]}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Back to home"
+        >
+          <Ionicons name="home" size={20} color={colors.onMedia} />
+        </Pressable>
+      )}
+
       <AddToListSheet media={media ?? null} visible={sheetOpen} onClose={() => setSheetOpen(false)} />
     </View>
   );
@@ -493,6 +512,15 @@ const useStyles = makeStyles(({ colors }) => ({
   backBtn: {
     position: 'absolute',
     left: spacing.lg,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  homeBtn: {
+    position: 'absolute',
+    right: spacing.lg,
     width: 40,
     height: 40,
     borderRadius: 20,

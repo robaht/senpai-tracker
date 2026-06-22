@@ -16,3 +16,17 @@ export function useGoBack() {
     else router.replace('/');
   }, [router]);
 }
+
+/**
+ * Jump straight to home (Discover), collapsing a deep push chain in one tap —
+ * e.g. after diving anime→anime through the related rails (F28). `dismissTo`
+ * pops the whole stack back to the index route; if there's nothing to dismiss
+ * (already at the root) we replace to home as a fallback.
+ */
+export function useGoHome() {
+  const router = useRouter();
+  return useCallback(() => {
+    if (router.canDismiss()) router.dismissTo('/');
+    else router.replace('/');
+  }, [router]);
+}
