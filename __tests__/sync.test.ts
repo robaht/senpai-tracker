@@ -2,7 +2,8 @@ import { reconcile, toRemoteScore, remoteToTrackEntry } from '../src/features/tr
 import type { MyListEntry } from '../src/api/anilist';
 import { media, trackEntry } from './_fixtures';
 
-const find = (list: { mediaId: number }[], id: number) => list.find((e) => e.mediaId === id);
+const find = <T extends { mediaId: number }>(list: T[], id: number): T | undefined =>
+  list.find((e) => e.mediaId === id);
 
 describe('reconcile', () => {
   it('keeps a remote-only entry without pushing it', () => {
