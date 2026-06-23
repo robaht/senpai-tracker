@@ -19,6 +19,8 @@ import { PressableScale } from '../src/components/ui/PressableScale';
 import { ImportFromAniListSheet } from '../src/components/ImportFromAniListSheet';
 import { ImportFromMyAnimeListSheet } from '../src/components/ImportFromMyAnimeListSheet';
 import { LibraryBackupSheet } from '../src/components/LibraryBackupSheet';
+import { AccountCard } from '../src/components/AccountCard';
+import { isAuthConfigured } from '../src/features/auth/config';
 import { usePreferencesStore, useRegion } from '../src/features/preferences/store';
 import { REGION_OPTIONS, regionLabel } from '../src/lib/streaming';
 import {
@@ -83,6 +85,15 @@ export default function SettingsScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
+        {isAuthConfigured() && (
+          <>
+            <Text variant="overline" color="textFaint" style={styles.sectionLabel}>
+              ACCOUNT
+            </Text>
+            <AccountCard />
+          </>
+        )}
+
         <Text variant="overline" color="textFaint" style={styles.sectionLabel}>
           LIBRARY
         </Text>

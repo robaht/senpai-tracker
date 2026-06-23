@@ -1,4 +1,5 @@
 import { anilistRequest } from './client';
+export { setAuthToken } from './client';
 import {
   AIRING_SCHEDULE_QUERY,
   BROWSE_QUERY,
@@ -11,6 +12,7 @@ import {
   TRACKED_AIRING_SCHEDULE_QUERY,
   TRENDING_QUERY,
   USER_LIST_QUERY,
+  VIEWER_QUERY,
 } from './queries';
 import type {
   AiringScheduleItem,
@@ -25,6 +27,7 @@ import type {
   Page,
   PageInfo,
   Recommendation,
+  Viewer,
 } from './types';
 
 export * from './types';
@@ -223,6 +226,19 @@ export async function getMediaByMalIds(malIds: number[]): Promise<Media[]> {
     perPage: malIds.length,
   });
   return data.Page.media ?? [];
+}
+
+/**
+ * Fetch the currently authenticated user. Requires `setAuthToken` to have been
+ * called with a valid bearer token; returns null if the token is missing/invalid.
+ */
+export async function getViewer(): Promise<Viewer | null> {
+  const data = await anilistRequest<{
+    Viewer: { id: number; name: string; avatar?: { large?: string | null; medium?: string | null } | null } | null;
+  }>(VIEWER_QUERY, {});
+  const v = data.Viewer;
+  if (!v) return null;
+  return { id: v.id, name: v.name, avatar: v.avatar?.large ?? v.avatar?.medium ?? null };
 }
 
 /** Returns the AniList season + year for a given date (defaults to now). */

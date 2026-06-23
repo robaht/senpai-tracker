@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { View } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import * as WebBrowser from 'expo-web-browser';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import {
@@ -17,7 +18,11 @@ import { useTrackingStore } from '../src/features/tracking/store';
 import { useComfortStore } from '../src/features/comfort/store';
 import { usePreferencesStore } from '../src/features/preferences/store';
 import { useDismissedStore } from '../src/features/recommendations/store';
+import { useAuthStore } from '../src/features/auth/store';
 import { ThemeProvider, useTheme } from '../src/theme';
+
+// Closes the OAuth popup and delivers the redirect result on web (F1).
+WebBrowser.maybeCompleteAuthSession();
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
@@ -33,13 +38,15 @@ export default function RootLayout() {
   const hydrateComfort = useComfortStore((s) => s.hydrate);
   const hydratePrefs = usePreferencesStore((s) => s.hydrate);
   const hydrateDismissed = useDismissedStore((s) => s.hydrate);
+  const hydrateAuth = useAuthStore((s) => s.hydrate);
   const prefsHydrated = usePreferencesStore((s) => s.hydrated);
   useEffect(() => {
     void hydrateTracking();
     void hydrateComfort();
     void hydratePrefs();
     void hydrateDismissed();
-  }, [hydrateTracking, hydrateComfort, hydratePrefs, hydrateDismissed]);
+    void hydrateAuth();
+  }, [hydrateTracking, hydrateComfort, hydratePrefs, hydrateDismissed, hydrateAuth]);
 
   // Gate on prefs too, so a saved light theme doesn't flash the dark default.
   const ready = fontsLoaded && prefsHydrated;

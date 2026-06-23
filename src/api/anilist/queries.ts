@@ -245,6 +245,20 @@ export const USER_LIST_QUERY = gql`
   }
 `;
 
+/** The currently authenticated user (requires an OAuth bearer token). F1. */
+export const VIEWER_QUERY = gql`
+  query Viewer {
+    Viewer {
+      id
+      name
+      avatar {
+        large
+        medium
+      }
+    }
+  }
+`;
+
 /**
  * Resolve a batch of *MyAnimeList* ids to AniList `Media` — powers "Import from
  * MyAnimeList". MAL exports key entries by MAL id, but our tracking is keyed by

@@ -235,3 +235,10 @@ export interface Page<T> {
 export function displayTitle(title: MediaTitle): string {
   return title.english || title.romaji || title.native || 'Untitled';
 }
+
+/** The signed-in AniList user (F1). */
+export interface Viewer {
+  id: number;
+  name: string;
+  avatar: string | null;
+}
