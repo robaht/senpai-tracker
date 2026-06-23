@@ -1,4 +1,4 @@
-import { GraphQLClient } from 'graphql-request';
+import { ClientError, GraphQLClient } from 'graphql-request';
 
 /**
  * AniList GraphQL endpoint. Public read access needs no API key.
@@ -24,13 +24,27 @@ export function setAuthToken(token: string | null): void {
   anilistClient.setHeaders(token ? { ...BASE_HEADERS, Authorization: `Bearer ${token}` } : { ...BASE_HEADERS });
 }
 
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
 /**
- * Thin wrapper so callers get a typed result and a single place to add future
- * concerns (retry-after handling on 429, logging).
+ * Single choke point for every AniList request. Retries on rate-limit (HTTP 429)
+ * up to a few times, honoring the `Retry-After` header (seconds) when present and
+ * otherwise backing off exponentially. This keeps bulk sync uploads from silently
+ * dropping entries when AniList throttles (~90 req/min).
  */
 export async function anilistRequest<TData, TVars extends object = object>(
   document: string,
   variables?: TVars,
 ): Promise<TData> {
-  return anilistClient.request<TData>(document, variables);
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await anilistClient.request<TData>(document, variables);
+    } catch (err) {
+      const status = err instanceof ClientError ? err.response.status : 0;
+      if (status !== 429 || attempt >= 4) throw err;
+      const retryAfter = Number(err instanceof ClientError ? err.response.headers?.get?.('Retry-After') : 0);
+      const waitSec = Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : 2 ** attempt;
+      await sleep(Math.min(waitSec * 1000, 60000));
+    }
+  }
 }

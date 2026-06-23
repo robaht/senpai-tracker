@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { getViewer, setAuthToken, type Viewer } from '../../api/anilist';
 import { useTrackingStore } from '../tracking/store';
+import { consumeRedirectToken } from './anilistAuth';
 import { clearToken, getToken, setToken } from './tokenStore';
 
 /**
@@ -24,7 +25,7 @@ interface AuthState {
   signOut: () => Promise<void>;
 }
 
-export const useAuthStore = create<AuthState>((set) => {
+export const useAuthStore = create<AuthState>((set, get) => {
   /** Apply a token everywhere and resolve the viewer; clears on failure. */
   const applyToken = async (token: string): Promise<boolean> => {
     setAuthToken(token);
@@ -46,6 +47,14 @@ export const useAuthStore = create<AuthState>((set) => {
     status: 'loading',
 
     hydrate: async () => {
+      // Web: if we just came back from AniList via a full-page redirect, the
+      // token is in the URL fragment — consume it (mobile web can't keep the
+      // in-memory sign-in promise across the redirect).
+      const redirectToken = consumeRedirectToken();
+      if (redirectToken) {
+        await get().completeSignIn(redirectToken);
+        return;
+      }
       const token = await getToken();
       if (!token) {
         set({ status: 'signedOut' });

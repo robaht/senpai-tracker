@@ -118,6 +118,11 @@ async function pushRemove(entry: TrackEntry): Promise<void> {
   }
 }
 
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+/** ~85 req/min — under AniList's ~90/min cap; 429s still auto-retry in the client. */
+const PUSH_INTERVAL_MS = 700;
+
 let syncing = false;
 
 /**
@@ -134,9 +139,11 @@ export async function pullAndReconcile(): Promise<void> {
     const local = Object.values(useTrackingStore.getState().entries);
     const { merged, toPush } = reconcile(local, remote);
     useTrackingStore.getState().restoreEntries(merged, 'replace');
-    for (const entry of toPush) {
-      // Sequential: keep the first-login upload gentle on AniList's ~90 req/min.
-      await pushUpsert(entry);
+    // Sequential + paced so a big first-login upload doesn't trip the rate limit
+    // and silently drop entries (429s also auto-retry in anilistRequest).
+    for (let i = 0; i < toPush.length; i++) {
+      await pushUpsert(toPush[i]);
+      if (i < toPush.length - 1) await sleep(PUSH_INTERVAL_MS);
     }
   } catch (err) {
     console.warn('[sync] pull/reconcile failed', err);
