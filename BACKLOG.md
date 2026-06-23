@@ -4,76 +4,36 @@ Planned features beyond the MVP. Each entry has user-facing requirements
 (acceptance criteria) and a technical approach grounded in the current codebase,
 so any one can be picked up cold and started smoothly.
 
-> **Current state — where the watch list lives:** on-device only. All tracking
-> goes through `TrackingRepository` → `AsyncStorageTrackingRepository`
-> (`src/features/tracking/repository.ts`), persisted as a single JSON blob under
-> the AsyncStorage key `senpai:tracking:v1` (localStorage on web). Per-device, no
-> account, no sync. Feature **F1** changes this.
+> **Current state — where the watch list lives:** local-first
+> (`AsyncStorageTrackingRepository`, `senpai:tracking:v1`), now optionally synced
+> to an **AniList account via OAuth** (F1 — shipped; `src/features/auth/` +
+> `src/features/tracking/sync.ts`). Local remains the offline cache; AniList is
+> the source of truth when signed in (zero backend — no custom server).
 
 ## Priority & effort overview
 
 | ID | Feature | Priority | Effort | Depends on |
 |----|---------|----------|--------|------------|
-| F1 | User accounts & cloud sync | P1 | L | — |
-| F3 | New-season alerts for watched anime + Upcoming screen | P2 | M–L | Notif. infra, (F1 for true push) |
+| F3 | New-season alerts for watched anime + Upcoming screen | P2 | M–L | Notif. infra; true push needs a server |
 | F7 | Deep multi-hop season chain (full S1→S2→S3 ordering) | P3 | M | — (extends shipped F2) |
-| F8 | Super Follow (per-title new-season announcement alerts) | P2 | M | Notif. infra, F1 (true push) |
+| F8 | Super Follow (per-title new-season announcement alerts) | P2 | M | Notif. infra; true push needs a server |
 | F18 | Tag browse + genre × season composition (genre browse shipped) | P3 | S–M | — (extends shipped genre browse) |
 | F22 | Per-screen signature treatments & motion | P3 | M | — (builds on shipped theme/token system) |
 | F26 | Network resilience — AniList 429/Retry-After + request timeout | P3 | S–M | — |
 | F27 | Web runtime robustness — ErrorBoundary, bounded cache persistence, sheet a11y | P3 | M | — |
 
 **Suggested build order** (fast value first, heavy infra last):
-`F1 → F3 → F7 → F8 → F18`.
-Start with the heavier discovery/infra items (F1/F3/F7/F8), with F18's small
-leftover (tags + season composition) as low-priority polish. Reorder freely —
-entries are independent except where "Depends on" says otherwise.
+`F3 → F7 → F8 → F18`, with the review items (F26/F27/F28) as independent
+hardening whenever. Reorder freely — entries are independent except where
+"Depends on" says otherwise.
 
 ### Shared prerequisites (cross-cutting)
 - **Notifications infrastructure** (needed by F3): `expo-notifications` setup +
   a **development build** (push/scheduled notifications don't run in Expo Go on
   current SDKs). One-time setup, then reusable.
-- **Cloud backend** (F1): also what enables *true* server-pushed alerts in F3.
-
----
-
-## F1 — User accounts & cloud sync
-
-**Goal:** Let a user own their list across devices instead of it living on one phone.
-
-### Requirements / acceptance criteria
-- [ ] User can create an account and sign in.
-- [ ] The watch list syncs across devices for the same account.
-- [ ] Offline-first is preserved: the app still works with no connection; changes
-      made offline sync when back online.
-- [ ] On first login, any existing on-device list is merged into the account
-      (no data loss for current local users).
-- [ ] Sign-out clears the in-memory list but keeps the local cache intact.
-
-### Two viable approaches
-1. **AniList OAuth (zero backend).** "Log in with AniList"; read/write the user's
-   real AniList `MediaList` via GraphQL mutations (`SaveMediaListEntry`,
-   `DeleteMediaListEntry`). Fastest path; taps lists they may already have.
-   Trade-off: requires an AniList account; data model tied to AniList.
-2. **Custom backend (Supabase recommended).** Email/social auth + a Postgres
-   table mirroring `TrackEntry`. Full control; enables storing app-specific data
-   later (theme prefs, recommendation history). Trade-off: a backend to build/host.
-
-> Decision to make when we start: AniList OAuth if you want zero backend + existing
-> lists; Supabase if you want your own user base and custom data. Given the rest of
-> the roadmap (themes prefs, rec history), Supabase is the more future-proof pick.
-
-### Technical approach
-- Add a new `TrackingRepository` implementation (`SupabaseTrackingRepository` or
-  `AniListTrackingRepository`) and swap the exported instance in
-  `repository.ts`. **This is the payoff of the repository seam — no screen or
-  store changes.**
-- Sync strategy: keep the local AsyncStorage repo as the offline cache; layer a
-  sync engine that pushes/pulls and resolves conflicts using the existing
-  `updatedAt` field on `TrackEntry` (last-write-wins to start).
-- Auth: `expo-auth-session` (OAuth) or Supabase JS client. Add an auth context +
-  an `app/(auth)/` route group with a login screen; gate sync on auth state.
-- Migration: on first authenticated launch, `replaceAll`/merge local → cloud.
+- **Push server** (for *true* app-closed alerts in F3/F8): F1 shipped as AniList
+  OAuth (zero backend), so server-pushed notifications still need a small service
+  polling AniList. Not built — without it, detection happens on app open.
 
 ---
 
