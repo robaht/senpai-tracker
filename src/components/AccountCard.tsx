@@ -6,7 +6,7 @@ import { radii, spacing, useTheme } from '../theme';
 import { withAlpha } from './ui/Badge';
 import { Text } from './ui/Text';
 import { useAuthStore } from '../features/auth/store';
-import { useAniListSignIn } from '../features/auth/anilistAuth';
+import { signInWithAniList } from '../features/auth/anilistAuth';
 
 /**
  * AniList account row in Settings (F1). Signed out → "Log in with AniList";
@@ -20,17 +20,13 @@ export function AccountCard() {
   const completeSignIn = useAuthStore((s) => s.completeSignIn);
   const signOut = useAuthStore((s) => s.signOut);
 
-  const [request, , promptAsync] = useAniListSignIn();
   const [busy, setBusy] = useState(false);
 
   const onSignIn = async () => {
-    if (!request) return;
     setBusy(true);
     try {
-      const res = await promptAsync();
-      if (res.type === 'success' && res.params.access_token) {
-        await completeSignIn(res.params.access_token);
-      }
+      const token = await signInWithAniList();
+      if (token) await completeSignIn(token);
     } finally {
       setBusy(false);
     }
@@ -63,7 +59,7 @@ export function AccountCard() {
     );
   }
 
-  const disabled = busy || !request;
+  const disabled = busy;
   return (
     <Pressable
       onPress={onSignIn}
