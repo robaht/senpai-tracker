@@ -19,6 +19,7 @@ import { useComfortStore } from '../src/features/comfort/store';
 import { usePreferencesStore } from '../src/features/preferences/store';
 import { useDismissedStore } from '../src/features/recommendations/store';
 import { useAuthStore } from '../src/features/auth/store';
+import { pullAndReconcile } from '../src/features/tracking/sync';
 import { ThemeProvider, useTheme } from '../src/theme';
 
 // Closes the OAuth popup and delivers the redirect result on web (F1).
@@ -39,6 +40,7 @@ export default function RootLayout() {
   const hydratePrefs = usePreferencesStore((s) => s.hydrate);
   const hydrateDismissed = useDismissedStore((s) => s.hydrate);
   const hydrateAuth = useAuthStore((s) => s.hydrate);
+  const authStatus = useAuthStore((s) => s.status);
   const prefsHydrated = usePreferencesStore((s) => s.hydrated);
   useEffect(() => {
     void hydrateTracking();
@@ -47,6 +49,12 @@ export default function RootLayout() {
     void hydrateDismissed();
     void hydrateAuth();
   }, [hydrateTracking, hydrateComfort, hydratePrefs, hydrateDismissed, hydrateAuth]);
+
+  // Once signed in (on sign-in or an authed app-start), pull + reconcile the
+  // AniList list. Guarded against overlap inside `pullAndReconcile`.
+  useEffect(() => {
+    if (authStatus === 'signedIn') void pullAndReconcile();
+  }, [authStatus]);
 
   // Gate on prefs too, so a saved light theme doesn't flash the dark default.
   const ready = fontsLoaded && prefsHydrated;

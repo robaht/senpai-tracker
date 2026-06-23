@@ -41,6 +41,11 @@ export interface TrackEntry {
   /** epoch ms — used for "recently updated" sorting and future sync conflict resolution. */
   updatedAt: number;
   createdAt: number;
+  /**
+   * AniList `MediaList` entry id, set once the entry is synced to an account (F1).
+   * Deletes need this (not the media id). Absent for local-only/unsynced entries.
+   */
+  remoteId?: number;
 }
 
 export const WATCH_STATUSES: WatchStatus[] = [

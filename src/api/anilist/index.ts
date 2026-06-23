@@ -13,7 +13,9 @@ import {
   TRENDING_QUERY,
   USER_LIST_QUERY,
   VIEWER_QUERY,
+  MY_LIST_QUERY,
 } from './queries';
+import { SAVE_MEDIA_LIST_ENTRY, DELETE_MEDIA_LIST_ENTRY } from './mutations';
 import type {
   AiringScheduleItem,
   BrowseFilters,
@@ -28,6 +30,8 @@ import type {
   PageInfo,
   Recommendation,
   Viewer,
+  MyListEntry,
+  ScoreFormat,
 } from './types';
 
 export * from './types';
@@ -234,11 +238,83 @@ export async function getMediaByMalIds(malIds: number[]): Promise<Media[]> {
  */
 export async function getViewer(): Promise<Viewer | null> {
   const data = await anilistRequest<{
-    Viewer: { id: number; name: string; avatar?: { large?: string | null; medium?: string | null } | null } | null;
+    Viewer: {
+      id: number;
+      name: string;
+      avatar?: { large?: string | null; medium?: string | null } | null;
+      mediaListOptions?: { scoreFormat?: ScoreFormat | null } | null;
+    } | null;
   }>(VIEWER_QUERY, {});
   const v = data.Viewer;
   if (!v) return null;
-  return { id: v.id, name: v.name, avatar: v.avatar?.large ?? v.avatar?.medium ?? null };
+  return {
+    id: v.id,
+    name: v.name,
+    avatar: v.avatar?.large ?? v.avatar?.medium ?? null,
+    scoreFormat: v.mediaListOptions?.scoreFormat ?? 'POINT_10',
+  };
+}
+
+interface RawMyListEntry {
+  id: number;
+  status: MediaListStatus;
+  progress: number | null;
+  score: number | null;
+  updatedAt: number | null;
+  createdAt: number | null;
+  media: Media | null;
+}
+
+/**
+ * Fetch the authenticated viewer's whole anime list (F1 sync), de-duplicated by
+ * media id, carrying the MediaList entry id (`remoteId`) needed for deletes.
+ * Timestamps are converted to epoch ms to match `TrackEntry`.
+ */
+export async function getMyAnimeList(userId: number): Promise<MyListEntry[]> {
+  const data = await anilistRequest<{
+    MediaListCollection: { lists: { entries: RawMyListEntry[] }[] } | null;
+  }>(MY_LIST_QUERY, { userId });
+
+  const seen = new Set<number>();
+  const out: MyListEntry[] = [];
+  for (const list of data.MediaListCollection?.lists ?? []) {
+    for (const e of list.entries ?? []) {
+      if (!e.media || seen.has(e.media.id)) continue;
+      seen.add(e.media.id);
+      out.push({
+        media: e.media,
+        remoteId: e.id,
+        status: e.status,
+        progress: e.progress ?? 0,
+        score: Math.round(e.score ?? 0),
+        updatedAt: e.updatedAt ? e.updatedAt * 1000 : Date.now(),
+        createdAt: e.createdAt ? e.createdAt * 1000 : Date.now(),
+      });
+    }
+  }
+  return out;
+}
+
+/** Upsert a list entry on AniList; returns the MediaList entry id (`remoteId`). */
+export async function saveMediaListEntry(vars: {
+  mediaId: number;
+  status: MediaListStatus;
+  progress: number;
+  score: number;
+}): Promise<number | null> {
+  const data = await anilistRequest<{ SaveMediaListEntry: { id: number } | null }>(
+    SAVE_MEDIA_LIST_ENTRY,
+    vars,
+  );
+  return data.SaveMediaListEntry?.id ?? null;
+}
+
+/** Delete a list entry on AniList by its MediaList entry id. */
+export async function deleteMediaListEntry(id: number): Promise<void> {
+  await anilistRequest<{ DeleteMediaListEntry: { deleted: boolean } | null }>(
+    DELETE_MEDIA_LIST_ENTRY,
+    { id },
+  );
 }
 
 /** Returns the AniList season + year for a given date (defaults to now). */

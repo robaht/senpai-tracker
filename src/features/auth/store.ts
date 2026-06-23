@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { getViewer, setAuthToken, type Viewer } from '../../api/anilist';
+import { useTrackingStore } from '../tracking/store';
 import { clearToken, getToken, setToken } from './tokenStore';
 
 /**
@@ -64,6 +65,8 @@ export const useAuthStore = create<AuthState>((set) => {
       await clearToken();
       setAuthToken(null);
       set({ token: null, viewer: null, status: 'signedOut' });
+      // Drop the synced list from memory but keep the local cache (per F1 AC).
+      useTrackingStore.getState().clearInMemory();
     },
   };
 });

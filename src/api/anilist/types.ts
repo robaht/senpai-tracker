@@ -201,6 +201,18 @@ export interface ImportedListEntry {
 }
 
 /**
+ * One entry from the *authenticated* viewer's list (F1 sync). Extends the import
+ * shape with the AniList `MediaList` entry id (needed for deletes) and createdAt.
+ */
+export interface MyListEntry extends ImportedListEntry {
+  remoteId: number;
+  createdAt: number;
+}
+
+/** AniList per-user score scale. We store scores as POINT_10 and convert on write. */
+export type ScoreFormat = 'POINT_100' | 'POINT_10_DECIMAL' | 'POINT_10' | 'POINT_5' | 'POINT_3';
+
+/**
  * One recommendation: a related title plus AniList's community rating (net
  * up/down votes) for how good a suggestion it is. Powers "More like this" and
  * the For You engine.
@@ -241,4 +253,6 @@ export interface Viewer {
   id: number;
   name: string;
   avatar: string | null;
+  /** The user's score scale, so writes convert from our internal POINT_10. */
+  scoreFormat: ScoreFormat;
 }

@@ -255,6 +255,34 @@ export const VIEWER_QUERY = gql`
         large
         medium
       }
+      mediaListOptions {
+        scoreFormat
+      }
+    }
+  }
+`;
+
+/**
+ * The authenticated viewer's full anime list (F1 sync). Like USER_LIST_QUERY but
+ * keyed by id and selecting the MediaList entry `id` (for deletes) + createdAt.
+ */
+export const MY_LIST_QUERY = gql`
+  ${MEDIA_FIELDS}
+  query MyAnimeList($userId: Int!) {
+    MediaListCollection(userId: $userId, type: ANIME) {
+      lists {
+        entries {
+          id
+          status
+          progress
+          score(format: POINT_10)
+          updatedAt
+          createdAt
+          media {
+            ...MediaFields
+          }
+        }
+      }
     }
   }
 `;

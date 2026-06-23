@@ -45,9 +45,28 @@ interface TrackingState {
    * resolution is needed — the same merge/replace + last-write-wins rules apply.
    */
   restoreEntries: (entries: TrackEntry[], mode: ImportMode) => ImportSummary;
+
+  /** Record an entry's AniList `remoteId` after a sync push (no timestamp bump). */
+  setRemoteId: (mediaId: number, remoteId: number) => void;
+  /** Drop the in-memory list (sign-out) WITHOUT clearing the persisted cache. */
+  clearInMemory: () => void;
 }
 
-function snapshotFromMedia(media: Media): Pick<
+/**
+ * Cloud-sync hooks, registered once by the sync layer at startup (F1). Kept as a
+ * module-level slot so the tracking store doesn't import the sync engine (which
+ * imports this store) — no circular dependency.
+ */
+export interface SyncHooks {
+  pushUpsert: (entry: TrackEntry) => void;
+  pushRemove: (entry: TrackEntry) => void;
+}
+let syncHooks: SyncHooks | null = null;
+export function registerSyncHooks(hooks: SyncHooks | null): void {
+  syncHooks = hooks;
+}
+
+export function snapshotFromMedia(media: Media): Pick<
   TrackEntry,
   'title' | 'coverImage' | 'coverColor' | 'format' | 'totalEpisodes' | 'duration' | 'genres'
 > {
@@ -68,6 +87,7 @@ export const useTrackingStore = create<TrackingState>((set, get) => {
   // source of truth for rendering, the repository for durability.
   const persist = (entry: TrackEntry) => {
     void trackingRepository.upsert(entry);
+    syncHooks?.pushUpsert(entry);
   };
 
   const update = (mediaId: number, patch: Partial<TrackEntry>) => {
@@ -108,12 +128,14 @@ export const useTrackingStore = create<TrackingState>((set, get) => {
     },
 
     untrack: (mediaId) => {
+      const removed = get().entries[mediaId];
       set((s) => {
         const next = { ...s.entries };
         delete next[mediaId];
         return { entries: next };
       });
       void trackingRepository.remove(mediaId);
+      if (removed) syncHooks?.pushRemove(removed);
     },
 
     setStatus: (mediaId, status) => update(mediaId, { status }),
@@ -204,6 +226,17 @@ export const useTrackingStore = create<TrackingState>((set, get) => {
       void trackingRepository.replaceAll(Object.values(next));
       return { added, updated, unchanged, total: entries.length };
     },
+
+    setRemoteId: (mediaId, remoteId) => {
+      const existing = get().entries[mediaId];
+      if (!existing || existing.remoteId === remoteId) return;
+      const next: TrackEntry = { ...existing, remoteId };
+      set((s) => ({ entries: { ...s.entries, [mediaId]: next } }));
+      // Persist the id but do NOT trigger a sync push (that would loop).
+      void trackingRepository.upsert(next);
+    },
+
+    clearInMemory: () => set({ entries: {} }),
   };
 });
 
