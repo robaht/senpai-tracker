@@ -8,6 +8,7 @@ import {
 } from '../../api/anilist';
 import { useAuthStore } from '../auth/store';
 import { registerSyncHooks, snapshotFromMedia, useTrackingStore } from './store';
+import { useSyncStore } from './syncStore';
 import type { TrackEntry, WatchStatus } from './types';
 
 /**
@@ -123,17 +124,16 @@ const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 /** ~85 req/min — under AniList's ~90/min cap; 429s still auto-retry in the client. */
 const PUSH_INTERVAL_MS = 700;
 
-let syncing = false;
-
 /**
  * Pull the viewer's AniList list and reconcile it with the local list, then push
- * up anything local-only or local-newer. Run on sign-in and each authed
- * app-start (also catches pushes missed while offline). Guarded against overlap.
+ * up anything local-only or local-newer. Run on sign-in, each authed app-start,
+ * and from the manual "Sync now" button. Overlap-guarded via the sync store.
  */
 export async function pullAndReconcile(): Promise<void> {
   const viewer = session();
-  if (!viewer || syncing) return;
-  syncing = true;
+  const sync = useSyncStore.getState();
+  if (!viewer || sync.syncing) return;
+  sync.setSyncing(true);
   try {
     const remote = (await getMyAnimeList(viewer.id)).map(remoteToTrackEntry);
     const local = Object.values(useTrackingStore.getState().entries);
@@ -145,10 +145,10 @@ export async function pullAndReconcile(): Promise<void> {
       await pushUpsert(toPush[i]);
       if (i < toPush.length - 1) await sleep(PUSH_INTERVAL_MS);
     }
+    useSyncStore.getState().markSynced();
   } catch (err) {
     console.warn('[sync] pull/reconcile failed', err);
-  } finally {
-    syncing = false;
+    useSyncStore.getState().setSyncing(false);
   }
 }
 

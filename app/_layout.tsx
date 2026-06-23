@@ -20,6 +20,7 @@ import { usePreferencesStore } from '../src/features/preferences/store';
 import { useDismissedStore } from '../src/features/recommendations/store';
 import { useAuthStore } from '../src/features/auth/store';
 import { pullAndReconcile } from '../src/features/tracking/sync';
+import { useSyncStore } from '../src/features/tracking/syncStore';
 import { ThemeProvider, useTheme } from '../src/theme';
 
 // Closes the OAuth popup and delivers the redirect result on web (F1).
@@ -48,6 +49,7 @@ export default function RootLayout() {
     void hydratePrefs();
     void hydrateDismissed();
     void hydrateAuth();
+    void useSyncStore.getState().hydrate();
   }, [hydrateTracking, hydrateComfort, hydratePrefs, hydrateDismissed, hydrateAuth]);
 
   // Once signed in (on sign-in or an authed app-start), pull + reconcile the
