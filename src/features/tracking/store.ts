@@ -143,13 +143,20 @@ export const useTrackingStore = create<TrackingState>((set, get) => {
     setProgress: (mediaId, progress) => {
       const entry = get().entries[mediaId];
       if (!entry) return;
-      const max = entry.totalEpisodes ?? Number.MAX_SAFE_INTEGER;
+      const total = entry.totalEpisodes;
+      const max = total ?? Number.MAX_SAFE_INTEGER;
       const clamped = Math.max(0, Math.min(progress, max));
-      // Auto-promote Plan-to-watch → Watching on the first logged episode. Only
-      // the forward PLANNING→CURRENT step; any other status is left untouched,
-      // and dropping back to 0 never reverts (entry is no longer PLANNING).
-      const promote = entry.status === 'PLANNING' && clamped > 0;
-      update(mediaId, promote ? { progress: clamped, status: 'CURRENT' } : { progress: clamped });
+      // Auto-advance status alongside progress:
+      // - reaching the final episode → Completed (the whole point of logging it),
+      // - first episode logged from Plan-to-watch → Watching.
+      // Only ever moves status forward; any other case leaves it untouched.
+      let status = entry.status;
+      if (total != null && total > 0 && clamped >= total && entry.status !== 'COMPLETED') {
+        status = 'COMPLETED';
+      } else if (entry.status === 'PLANNING' && clamped > 0) {
+        status = 'CURRENT';
+      }
+      update(mediaId, status !== entry.status ? { progress: clamped, status } : { progress: clamped });
     },
 
     incrementProgress: (mediaId) => {

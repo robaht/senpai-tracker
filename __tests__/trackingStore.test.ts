@@ -4,6 +4,43 @@ import { media, trackEntry } from './_fixtures';
 
 const reset = () => useTrackingStore.setState({ entries: {}, hydrated: true });
 
+describe('trackingStore.setProgress / incrementProgress', () => {
+  beforeEach(reset);
+
+  const seed = (entry = trackEntry(1)) => useTrackingStore.setState({ entries: { [entry.mediaId]: entry } });
+  const get = (id = 1) => useTrackingStore.getState().entries[id];
+
+  it('auto-completes when progress reaches the final episode', () => {
+    seed(trackEntry(1, { status: 'CURRENT', progress: 11, totalEpisodes: 12 }));
+    useTrackingStore.getState().setProgress(1, 12);
+    expect(get()).toMatchObject({ progress: 12, status: 'COMPLETED' });
+  });
+
+  it('auto-completes via incrementProgress on the last episode', () => {
+    seed(trackEntry(1, { status: 'CURRENT', progress: 11, totalEpisodes: 12 }));
+    useTrackingStore.getState().incrementProgress(1);
+    expect(get()).toMatchObject({ progress: 12, status: 'COMPLETED' });
+  });
+
+  it('stays Watching before the final episode', () => {
+    seed(trackEntry(1, { status: 'CURRENT', progress: 5, totalEpisodes: 12 }));
+    useTrackingStore.getState().setProgress(1, 6);
+    expect(get()).toMatchObject({ progress: 6, status: 'CURRENT' });
+  });
+
+  it('promotes Plan-to-watch to Watching on the first episode', () => {
+    seed(trackEntry(1, { status: 'PLANNING', progress: 0, totalEpisodes: 12 }));
+    useTrackingStore.getState().setProgress(1, 1);
+    expect(get()).toMatchObject({ progress: 1, status: 'CURRENT' });
+  });
+
+  it('never auto-completes when the episode count is unknown', () => {
+    seed(trackEntry(1, { status: 'CURRENT', progress: 50, totalEpisodes: null }));
+    useTrackingStore.getState().setProgress(1, 51);
+    expect(get()).toMatchObject({ progress: 51, status: 'CURRENT' });
+  });
+});
+
 describe('trackingStore.restoreEntries', () => {
   beforeEach(reset);
 
