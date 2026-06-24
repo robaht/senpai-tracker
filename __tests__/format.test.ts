@@ -1,4 +1,26 @@
-import { formatCountdown, formatScore, stripHtml, humanizeEnum } from '../src/lib/format';
+import {
+  formatCountdown,
+  formatScore,
+  stripHtml,
+  humanizeEnum,
+  premiereLabel,
+} from '../src/lib/format';
+
+describe('premiereLabel', () => {
+  const now = () => Math.floor(Date.now() / 1000);
+
+  it('returns null once the premiere is in the past', () => {
+    expect(premiereLabel(now() - 3600)).toBeNull();
+  });
+
+  it('counts down within a week', () => {
+    expect(premiereLabel(now() + 2 * 86400 + 4 * 3600 + 30)).toMatch(/^Airs in 2d 4h$/);
+  });
+
+  it('shows a calendar date further out', () => {
+    expect(premiereLabel(now() + 20 * 86400)).toMatch(/^Premieres /);
+  });
+});
 
 describe('formatCountdown', () => {
   it('formats days / hours / minutes and past times', () => {

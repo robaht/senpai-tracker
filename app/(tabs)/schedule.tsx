@@ -6,22 +6,33 @@ import { Skeleton } from '../../src/components/ui/Skeleton';
 import { withAlpha } from '../../src/components/ui/Badge';
 import { ScheduleRow } from '../../src/components/ScheduleRow';
 import { EmptyState } from '../../src/components/EmptyState';
-import { useAiringSchedule, useTrackedAiringSchedule, flattenPages } from '../../src/api/anilist/hooks';
+import { AddToListSheet } from '../../src/components/AddToListSheet';
+import {
+  useAiringSchedule,
+  useTrackedAiringSchedule,
+  useUpcomingPremieres,
+  flattenPages,
+} from '../../src/api/anilist/hooks';
 import { useTrackingStore } from '../../src/features/tracking/store';
-import { airingDayLabel } from '../../src/lib/format';
-import type { AiringScheduleItem } from '../../src/api/anilist';
+import { airingDayLabel, airingDateLabel } from '../../src/lib/format';
+import type { AiringScheduleItem, Media } from '../../src/api/anilist';
 import { spacing, makeStyles, useTheme } from '../../src/theme';
 
 const BOTTOM_SPACE = 110;
 const ALL_WINDOW_DAYS = 7;
 /** "My list" uses a wider window — the result set is just the user's titles. */
 const TRACKED_WINDOW_DAYS = 14;
+/** "Upcoming" looks further out — premieres are sparser than weekly episodes. */
+const UPCOMING_WINDOW_DAYS = 30;
+
+type ScheduleView = 'all' | 'tracked' | 'upcoming';
 
 export default function ScheduleScreen() {
   const entries = useTrackingStore((s) => s.entries);
   const styles = useStyles();
   const { colors } = useTheme();
-  const [onlyTracked, setOnlyTracked] = useState(false);
+  const [view, setView] = useState<ScheduleView>('all');
+  const [addTarget, setAddTarget] = useState<Media | null>(null);
 
   const trackedIds = useMemo(() => Object.keys(entries).map(Number), [entries]);
 
@@ -29,12 +40,14 @@ export default function ScheduleScreen() {
   // Ask AniList for exactly the tracked ids rather than filtering the global feed,
   // which is capped at one page and truncates before reaching most tracked titles.
   const tracked = useTrackedAiringSchedule(trackedIds, TRACKED_WINDOW_DAYS);
+  const upcoming = useUpcomingPremieres(UPCOMING_WINDOW_DAYS);
 
-  const active = onlyTracked ? tracked : all;
-  const windowDays = onlyTracked ? TRACKED_WINDOW_DAYS : ALL_WINDOW_DAYS;
+  const active = view === 'tracked' ? tracked : view === 'upcoming' ? upcoming : all;
+  const windowDays =
+    view === 'tracked' ? TRACKED_WINDOW_DAYS : view === 'upcoming' ? UPCOMING_WINDOW_DAYS : ALL_WINDOW_DAYS;
   const hasTracked = trackedIds.length > 0;
   // An empty tracked list disables the query (never "loading"); treat as resolved.
-  const isLoading = onlyTracked ? hasTracked && active.isLoading : active.isLoading;
+  const isLoading = view === 'tracked' ? hasTracked && active.isLoading : active.isLoading;
 
   const loadMore = () => {
     if (active.hasNextPage && !active.isFetchingNextPage) active.fetchNextPage();
@@ -42,27 +55,30 @@ export default function ScheduleScreen() {
 
   const sections = useMemo(() => {
     const items = flattenPages(active.data, (i) => i.id);
+    // Premieres span a month, so weekday names would collide — group by date.
+    const label = view === 'upcoming' ? airingDateLabel : airingDayLabel;
     const byDay = new Map<string, AiringScheduleItem[]>();
     for (const item of items) {
-      const label = airingDayLabel(item.airingAt);
-      const arr = byDay.get(label) ?? [];
+      const key = label(item.airingAt);
+      const arr = byDay.get(key) ?? [];
       arr.push(item);
-      byDay.set(label, arr);
+      byDay.set(key, arr);
     }
     return Array.from(byDay.entries()).map(([title, rows]) => ({ title, data: rows }));
-  }, [active.data]);
+  }, [active.data, view]);
 
   return (
     <Screen>
       <View style={styles.headerWrap}>
         <Text variant="overline" color="textFaint">
-          NEXT {windowDays} DAYS
+          {view === 'upcoming' ? 'UPCOMING PREMIERES' : `NEXT ${windowDays} DAYS`}
         </Text>
         <Text variant="display">Schedule</Text>
 
         <View style={styles.filters}>
-          <FilterPill label="All airing" active={!onlyTracked} onPress={() => setOnlyTracked(false)} />
-          <FilterPill label="My list" active={onlyTracked} onPress={() => setOnlyTracked(true)} />
+          <FilterPill label="All airing" active={view === 'all'} onPress={() => setView('all')} />
+          <FilterPill label="My list" active={view === 'tracked'} onPress={() => setView('tracked')} />
+          <FilterPill label="Upcoming" active={view === 'upcoming'} onPress={() => setView('upcoming')} />
         </View>
       </View>
 
@@ -90,33 +106,48 @@ export default function ScheduleScreen() {
               {section.title}
             </Text>
           )}
-          renderItem={({ item }) => <ScheduleRow item={item} />}
+          renderItem={({ item }) => (
+            <ScheduleRow item={item} onAdd={view === 'upcoming' ? setAddTarget : undefined} />
+          )}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
           ListFooterComponent={
             active.isFetchingNextPage ? (
               <ActivityIndicator color={colors.accent} style={styles.footer} />
             ) : null
           }
-          ListEmptyComponent={
-            <ScheduleEmpty onlyTracked={onlyTracked} hasTracked={hasTracked} days={windowDays} />
-          }
+          ListEmptyComponent={<ScheduleEmpty view={view} hasTracked={hasTracked} days={windowDays} />}
         />
       )}
+
+      <AddToListSheet
+        media={addTarget}
+        visible={addTarget != null}
+        onClose={() => setAddTarget(null)}
+      />
     </Screen>
   );
 }
 
 /** Empty state that distinguishes "no list" from "nothing airing" for the tracked view. */
 function ScheduleEmpty({
-  onlyTracked,
+  view,
   hasTracked,
   days,
 }: {
-  onlyTracked: boolean;
+  view: ScheduleView;
   hasTracked: boolean;
   days: number;
 }) {
-  if (!onlyTracked) {
+  if (view === 'upcoming') {
+    return (
+      <EmptyState
+        emoji="🌱"
+        title="No premieres scheduled"
+        subtitle={`Nothing new premieres in the next ${days} days. Check back soon.`}
+      />
+    );
+  }
+  if (view === 'all') {
     return (
       <EmptyState
         emoji="✶"

@@ -1,15 +1,27 @@
 import { useRouter } from 'expo-router';
 import { Image } from 'expo-image';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, Pressable } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { radii, spacing, useTheme } from '../theme';
 import { Text } from './ui/Text';
+import { withAlpha } from './ui/Badge';
 import { PressableScale } from './ui/PressableScale';
-import { displayTitle, type AiringScheduleItem } from '../api/anilist';
+import { displayTitle, type AiringScheduleItem, type Media } from '../api/anilist';
 import { useIsTracked } from '../features/tracking/store';
 import { airingTimeLabel, formatCountdown, humanizeEnum } from '../lib/format';
 
-/** One airing in the weekly schedule: cover, title, episode + countdown. */
-export function ScheduleRow({ item }: { item: AiringScheduleItem }) {
+/**
+ * One airing in the weekly schedule: cover, title, episode + countdown.
+ * When `onAdd` is supplied (the Upcoming view), a trailing "+" lets the user
+ * pick up the title without leaving the schedule; a check shows once tracked.
+ */
+export function ScheduleRow({
+  item,
+  onAdd,
+}: {
+  item: AiringScheduleItem;
+  onAdd?: (media: Media) => void;
+}) {
   const router = useRouter();
   const { colors } = useTheme();
   const tracked = useIsTracked(item.media.id);
@@ -49,6 +61,22 @@ export function ScheduleRow({ item }: { item: AiringScheduleItem }) {
           in {formatCountdown(secondsUntil)}
         </Text>
       </View>
+
+      {onAdd && (
+        <Pressable
+          onPress={() => onAdd(item.media)}
+          hitSlop={8}
+          style={[styles.add, { backgroundColor: withAlpha(colors.accent, tracked ? 0.1 : 0.18) }]}
+          accessibilityRole="button"
+          accessibilityLabel={tracked ? 'Already on your list' : 'Add to your list'}
+        >
+          <Ionicons
+            name={tracked ? 'checkmark' : 'add'}
+            size={20}
+            color={tracked ? colors.accentSoft : colors.accent}
+          />
+        </Pressable>
+      )}
     </PressableScale>
   );
 }
@@ -84,5 +112,12 @@ const styles = StyleSheet.create({
   right: {
     alignItems: 'flex-end',
     gap: 2,
+  },
+  add: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

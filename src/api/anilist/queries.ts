@@ -30,6 +30,11 @@ export const MEDIA_FIELDS = gql`
     popularity
     season
     seasonYear
+    startDate {
+      year
+      month
+      day
+    }
     studios(isMain: true) {
       nodes {
         id
@@ -354,6 +359,36 @@ export const TRACKED_AIRING_SCHEDULE_QUERY = gql`
         perPage
       }
       airingSchedules(mediaId_in: $ids, airingAt_greater: $from, airingAt_lesser: $to, sort: TIME) {
+        id
+        airingAt
+        episode
+        media {
+          ...MediaFields
+        }
+      }
+    }
+  }
+`;
+
+/**
+ * Upcoming *premieres* within a unix-time window — powers the Schedule screen's
+ * "Upcoming" filter. Filtering airing schedules to `episode: 1` returns first
+ * episodes only, i.e. shows that haven't started airing yet (a new season is a
+ * separate Media on AniList, so sequels restart at ep 1 and correctly show up).
+ * Sorted by time so the soonest premiere is first.
+ */
+export const UPCOMING_PREMIERES_QUERY = gql`
+  ${MEDIA_FIELDS}
+  query UpcomingPremieres($from: Int!, $to: Int!, $page: Int = 1, $perPage: Int = 50) {
+    Page(page: $page, perPage: $perPage) {
+      pageInfo {
+        hasNextPage
+        currentPage
+        lastPage
+        total
+        perPage
+      }
+      airingSchedules(episode: 1, airingAt_greater: $from, airingAt_lesser: $to, sort: TIME) {
         id
         airingAt
         episode

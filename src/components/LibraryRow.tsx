@@ -8,6 +8,7 @@ import { Badge, withAlpha } from './ui/Badge';
 import { PressableScale } from './ui/PressableScale';
 import { STATUS_META, statusColor, type TrackEntry } from '../features/tracking/types';
 import { useTrackingStore } from '../features/tracking/store';
+import { premiereLabel } from '../lib/format';
 
 /** A row in the Library: cover, title, status, progress bar + quick +1 control. */
 export function LibraryRow({ entry }: { entry: TrackEntry }) {
@@ -16,6 +17,8 @@ export function LibraryRow({ entry }: { entry: TrackEntry }) {
   const increment = useTrackingStore((s) => s.incrementProgress);
   const meta = STATUS_META[entry.status];
   const color = statusColor(colors, entry.status);
+  // Not-yet-released titles carry a self-clearing premiere countdown badge.
+  const premiere = entry.premiereAt != null ? premiereLabel(entry.premiereAt) : null;
 
   const total = entry.totalEpisodes;
   const pct = total ? Math.min(1, entry.progress / total) : entry.progress > 0 ? 0.05 : 0;
@@ -37,6 +40,7 @@ export function LibraryRow({ entry }: { entry: TrackEntry }) {
         </Text>
         <View style={styles.metaLine}>
           <Badge label={meta.short} color={color} />
+          {premiere && <Badge label={premiere} color={colors.info} />}
           {entry.score > 0 && (
             <Text variant="caption" color={colors.warning}>
               ★ {entry.score}

@@ -10,6 +10,7 @@ import {
   SEARCH_QUERY,
   SEASONAL_QUERY,
   TRACKED_AIRING_SCHEDULE_QUERY,
+  UPCOMING_PREMIERES_QUERY,
   TRENDING_QUERY,
   USER_LIST_QUERY,
   VIEWER_QUERY,
@@ -177,6 +178,23 @@ export async function getTrackedAiringSchedule(
   const data = await anilistRequest<RawPage<{ airingSchedules: AiringScheduleItem[] }>>(
     TRACKED_AIRING_SCHEDULE_QUERY,
     { ids, from, to, page, perPage },
+  );
+  return toPage(data.Page.pageInfo, data.Page.airingSchedules);
+}
+
+/**
+ * Upcoming premieres (episode 1) within a unix-time window — shows that haven't
+ * started airing yet, soonest first. Powers the Schedule screen's "Upcoming" view.
+ */
+export async function getUpcomingPremieres(
+  from: number,
+  to: number,
+  page = 1,
+  perPage = 50,
+): Promise<Page<AiringScheduleItem>> {
+  const data = await anilistRequest<RawPage<{ airingSchedules: AiringScheduleItem[] }>>(
+    UPCOMING_PREMIERES_QUERY,
+    { from, to, page, perPage },
   );
   return toPage(data.Page.pageInfo, data.Page.airingSchedules);
 }

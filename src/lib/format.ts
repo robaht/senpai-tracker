@@ -24,6 +24,34 @@ export function airingDayLabel(airingAtSeconds: number): string {
   return WEEKDAYS[date.getDay()];
 }
 
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/**
+ * "Today" / "Tomorrow" / "Sat 28 Jun" — a calendar-date label, unique per date
+ * (unlike `airingDayLabel`, whose weekday names repeat across a long window).
+ */
+export function airingDateLabel(airingAtSeconds: number): string {
+  const date = new Date(airingAtSeconds * 1000);
+  const now = new Date();
+  const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const diffDays = Math.round((startOfDay(date) - startOfDay(now)) / 86400000);
+  if (diffDays === 0) return 'Today';
+  if (diffDays === 1) return 'Tomorrow';
+  return `${WEEKDAYS[date.getDay()]} ${date.getDate()} ${MONTHS[date.getMonth()]}`;
+}
+
+/**
+ * Badge text for a not-yet-released title's premiere. Returns null once the
+ * premiere is in the past; "Airs in 2d 4h" within a week; "Premieres Sat 28 Jun"
+ * further out.
+ */
+export function premiereLabel(premiereAtSeconds: number): string | null {
+  const secondsUntil = premiereAtSeconds - Math.floor(Date.now() / 1000);
+  if (secondsUntil <= 0) return null;
+  if (secondsUntil <= 7 * 86400) return `Airs in ${formatCountdown(secondsUntil)}`;
+  return `Premieres ${airingDateLabel(premiereAtSeconds)}`;
+}
+
 /** "8:30 PM" local time for a unix-seconds timestamp. */
 export function airingTimeLabel(airingAtSeconds: number): string {
   return new Date(airingAtSeconds * 1000).toLocaleTimeString([], {

@@ -120,6 +120,8 @@ export interface Media {
   popularity: number | null;
   season: MediaSeason | null;
   seasonYear: number | null;
+  /** Scheduled start date; parts may be null when AniList only knows a year/month. */
+  startDate?: { year: number | null; month: number | null; day: number | null } | null;
   studios?: { nodes: { id: number; name: string }[] };
   nextAiringEpisode: AiringSchedule | null;
   trailer?: MediaTrailer | null;

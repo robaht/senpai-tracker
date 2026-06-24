@@ -37,6 +37,13 @@ export interface TrackEntry {
   duration: number | null;
   /** Genre names, if known. Powers the stats genre breakdown. */
   genres: string[];
+  /**
+   * Unix seconds of the premiere, set only when the title was NOT_YET_RELEASED at
+   * track time. Powers the Library's "Airs soon" countdown badge; being an
+   * absolute timestamp, it self-corrects (badge clears once the show airs) with
+   * no refetch. Optional/undefined for released titles and pre-existing entries.
+   */
+  premiereAt?: number | null;
   // --- bookkeeping ---
   /** epoch ms — used for "recently updated" sorting and future sync conflict resolution. */
   updatedAt: number;

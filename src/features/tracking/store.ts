@@ -66,9 +66,24 @@ export function registerSyncHooks(hooks: SyncHooks | null): void {
   syncHooks = hooks;
 }
 
+/**
+ * Premiere timestamp for the "Airs soon" badge — only for titles that haven't
+ * started airing yet. Prefers the scheduled episode-1 air time, falling back to
+ * a fully-specified start date. Null for released titles or when no date is known.
+ */
+export function premiereFromMedia(media: Media): number | null {
+  if (media.status !== 'NOT_YET_RELEASED') return null;
+  if (media.nextAiringEpisode?.airingAt) return media.nextAiringEpisode.airingAt;
+  const sd = media.startDate;
+  if (sd?.year && sd.month && sd.day) {
+    return Math.floor(new Date(sd.year, sd.month - 1, sd.day).getTime() / 1000);
+  }
+  return null;
+}
+
 export function snapshotFromMedia(media: Media): Pick<
   TrackEntry,
-  'title' | 'coverImage' | 'coverColor' | 'format' | 'totalEpisodes' | 'duration' | 'genres'
+  'title' | 'coverImage' | 'coverColor' | 'format' | 'totalEpisodes' | 'duration' | 'genres' | 'premiereAt'
 > {
   return {
     title: displayTitle(media.title),
@@ -78,6 +93,7 @@ export function snapshotFromMedia(media: Media): Pick<
     totalEpisodes: media.episodes ?? null,
     duration: media.duration ?? null,
     genres: media.genres ?? [],
+    premiereAt: premiereFromMedia(media),
   };
 }
 

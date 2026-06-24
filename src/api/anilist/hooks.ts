@@ -14,6 +14,7 @@ import {
   getSeasonal,
   getTrackedAiringSchedule,
   getTrending,
+  getUpcomingPremieres,
   searchAnime,
 } from './index';
 import type { BrowseFilters, MediaSeason, Page } from './types';
@@ -36,6 +37,7 @@ export const animeKeys = {
   airing: (from: number, to: number) => [...animeKeys.all, 'airing', from, to] as const,
   trackedAiring: (ids: number[], from: number, to: number) =>
     [...animeKeys.all, 'airing', 'tracked', ids, from, to] as const,
+  upcoming: (from: number, to: number) => [...animeKeys.all, 'upcoming', from, to] as const,
 };
 
 /**
@@ -166,5 +168,21 @@ export function useTrackedAiringSchedule(ids: number[], days = 14) {
     initialPageParam: 1,
     getNextPageParam: nextPage,
     enabled: sorted.length > 0,
+  });
+}
+
+/**
+ * Upcoming premieres over the next `days` days — shows that haven't aired yet.
+ * A wider default window than `useAiringSchedule` since premieres are sparser
+ * than weekly episodes.
+ */
+export function useUpcomingPremieres(days = 30) {
+  const from = Math.floor(Date.now() / 1000);
+  const to = from + days * 24 * 60 * 60;
+  return useInfiniteQuery({
+    queryKey: animeKeys.upcoming(from - (from % 3600), to - (to % 3600)),
+    queryFn: ({ pageParam }) => getUpcomingPremieres(from, to, pageParam, 50),
+    initialPageParam: 1,
+    getNextPageParam: nextPage,
   });
 }

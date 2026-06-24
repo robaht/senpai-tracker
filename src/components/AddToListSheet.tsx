@@ -5,7 +5,8 @@ import { withAlpha } from './ui/Badge';
 import { BottomSheet } from './ui/BottomSheet';
 import { displayTitle, type Media } from '../api/anilist';
 import { STATUS_META, WATCH_STATUSES, statusColor, type WatchStatus } from '../features/tracking/types';
-import { useTrackEntry, useTrackingStore } from '../features/tracking/store';
+import { premiereFromMedia, useTrackEntry, useTrackingStore } from '../features/tracking/store';
+import { premiereLabel } from '../lib/format';
 
 interface AddToListSheetProps {
   media: Media | null;
@@ -26,6 +27,9 @@ export function AddToListSheet({ media, visible, onClose }: AddToListSheetProps)
     onClose();
   };
 
+  const premiereAt = media ? premiereFromMedia(media) : null;
+  const premiere = premiereAt != null ? premiereLabel(premiereAt) : null;
+
   return (
     <BottomSheet visible={visible} onClose={onClose}>
       {media && (
@@ -33,9 +37,14 @@ export function AddToListSheet({ media, visible, onClose }: AddToListSheetProps)
           <Text variant="caption" color="textFaint" uppercase>
             Add to list
           </Text>
-          <Text variant="heading" numberOfLines={1} style={styles.title}>
+          <Text variant="heading" numberOfLines={1} style={premiere ? undefined : styles.title}>
             {displayTitle(media.title)}
           </Text>
+          {premiere && (
+            <Text variant="callout" color={colors.info} style={styles.premiere}>
+              {premiere}
+            </Text>
+          )}
 
           <View style={styles.options}>
             {WATCH_STATUSES.map((status) => {
@@ -87,6 +96,10 @@ export function AddToListSheet({ media, visible, onClose }: AddToListSheetProps)
 
 const styles = StyleSheet.create({
   title: {
+    marginTop: 2,
+    marginBottom: spacing.lg,
+  },
+  premiere: {
     marginTop: 2,
     marginBottom: spacing.lg,
   },
