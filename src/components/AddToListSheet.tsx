@@ -1,5 +1,5 @@
 import { Pressable, View, StyleSheet } from 'react-native';
-import { radii, spacing, useTheme } from '../theme';
+import { spacing, makeStyles, useTheme } from '../theme';
 import { Text } from './ui/Text';
 import { withAlpha } from './ui/Badge';
 import { BottomSheet } from './ui/BottomSheet';
@@ -17,6 +17,7 @@ interface AddToListSheetProps {
 /** Bottom-sheet status picker for adding / moving / removing an anime. */
 export function AddToListSheet({ media, visible, onClose }: AddToListSheetProps) {
   const { colors } = useTheme();
+  const styles = useStyles();
   const entry = useTrackEntry(media?.id ?? -1);
   const track = useTrackingStore((s) => s.track);
   const untrack = useTrackingStore((s) => s.untrack);
@@ -94,7 +95,7 @@ export function AddToListSheet({ media, visible, onClose }: AddToListSheetProps)
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ radii }) => ({
   title: {
     marginTop: 2,
     marginBottom: spacing.lg,
@@ -128,4 +129,4 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.lg,
     marginTop: spacing.sm,
   },
-});
+}));

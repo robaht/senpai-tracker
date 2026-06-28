@@ -1,5 +1,5 @@
 import { Text as RNText, TextProps as RNTextProps, StyleSheet } from 'react-native';
-import { typography, TypographyVariant, useTheme, type ColorToken } from '../../theme';
+import { TypographyVariant, useTheme, type ColorToken } from '../../theme';
 
 export interface TextProps extends RNTextProps {
   variant?: TypographyVariant;
@@ -23,7 +23,7 @@ export function Text({
   children,
   ...rest
 }: TextProps) {
-  const { colors } = useTheme();
+  const { colors, typography } = useTheme();
   const resolvedColor = color in colors ? colors[color as ColorToken] : color;
   return (
     <RNText

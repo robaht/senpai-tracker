@@ -2,7 +2,7 @@ import { useRouter } from 'expo-router';
 import { Image } from 'expo-image';
 import { View, StyleSheet, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { radii, spacing, useTheme } from '../theme';
+import { spacing, makeStyles, useTheme } from '../theme';
 import { Text } from './ui/Text';
 import { withAlpha } from './ui/Badge';
 import { PressableScale } from './ui/PressableScale';
@@ -23,7 +23,8 @@ export function ScheduleRow({
   onAdd?: (media: Media) => void;
 }) {
   const router = useRouter();
-  const { colors } = useTheme();
+  const { colors, retro } = useTheme();
+  const styles = useStyles();
   const tracked = useIsTracked(item.media.id);
   const uri = item.media.coverImage?.large ?? item.media.coverImage?.extraLarge ?? undefined;
   const secondsUntil = item.airingAt - Math.floor(Date.now() / 1000);
@@ -31,10 +32,16 @@ export function ScheduleRow({
   return (
     <PressableScale
       activeScale={0.98}
-      style={styles.row}
+      style={[styles.row, retro && styles.rowRetro, retro && { backgroundColor: colors.surface, borderColor: colors.borderStrong }]}
       onPress={() => router.push(`/anime/${item.media.id}`)}
     >
-      <View style={[styles.coverWrap, { backgroundColor: item.media.coverImage?.color ?? colors.surface }]}>
+      <View
+        style={[
+          styles.coverWrap,
+          retro && styles.coverWrapRetro,
+          { backgroundColor: item.media.coverImage?.color ?? colors.surface, borderColor: colors.borderStrong },
+        ]}
+      >
         <Image source={uri} style={styles.cover} contentFit="cover" transition={200} />
       </View>
 
@@ -81,18 +88,28 @@ export function ScheduleRow({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ radii }) => ({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
     paddingVertical: spacing.sm,
   },
+  rowRetro: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    marginVertical: spacing.xs,
+    borderRadius: radii.lg,
+    borderWidth: 3,
+  },
   coverWrap: {
     width: 46,
     height: 64,
     borderRadius: radii.sm,
     overflow: 'hidden',
+  },
+  coverWrapRetro: {
+    borderWidth: 2,
   },
   cover: { width: '100%', height: '100%' },
   body: {
@@ -120,4 +137,4 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-});
+}));

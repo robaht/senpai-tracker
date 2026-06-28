@@ -2,7 +2,7 @@ import { useRouter } from 'expo-router';
 import { Image } from 'expo-image';
 import { View, StyleSheet, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { radii, spacing, useTheme } from '../theme';
+import { spacing, makeStyles, useTheme } from '../theme';
 import { Text } from './ui/Text';
 import { Badge, withAlpha } from './ui/Badge';
 import { PressableScale } from './ui/PressableScale';
@@ -13,7 +13,8 @@ import { premiereLabel } from '../lib/format';
 /** A row in the Library: cover, title, status, progress bar + quick +1 control. */
 export function LibraryRow({ entry }: { entry: TrackEntry }) {
   const router = useRouter();
-  const { colors } = useTheme();
+  const { colors, retro } = useTheme();
+  const styles = useStyles();
   const increment = useTrackingStore((s) => s.incrementProgress);
   const meta = STATUS_META[entry.status];
   const color = statusColor(colors, entry.status);
@@ -27,10 +28,16 @@ export function LibraryRow({ entry }: { entry: TrackEntry }) {
   return (
     <PressableScale
       activeScale={0.98}
-      style={styles.row}
+      style={[styles.row, retro && styles.rowRetro, retro && { backgroundColor: colors.surface, borderColor: colors.borderStrong }]}
       onPress={() => router.push(`/anime/${entry.mediaId}`)}
     >
-      <View style={[styles.coverWrap, { backgroundColor: entry.coverColor ?? colors.surface }]}>
+      <View
+        style={[
+          styles.coverWrap,
+          retro && styles.coverWrapRetro,
+          { backgroundColor: entry.coverColor ?? colors.surface, borderColor: colors.borderStrong },
+        ]}
+      >
         <Image source={entry.coverImage ?? undefined} style={styles.cover} contentFit="cover" transition={200} />
       </View>
 
@@ -79,18 +86,29 @@ export function LibraryRow({ entry }: { entry: TrackEntry }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ radii }) => ({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
     paddingVertical: spacing.sm,
   },
+  // Retro: each entry becomes its own cream dialog box.
+  rowRetro: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    marginVertical: spacing.xs,
+    borderRadius: radii.lg,
+    borderWidth: 3,
+  },
   coverWrap: {
     width: 52,
     height: 72,
     borderRadius: radii.sm,
     overflow: 'hidden',
+  },
+  coverWrapRetro: {
+    borderWidth: 2,
   },
   cover: { width: '100%', height: '100%' },
   body: {
@@ -125,4 +143,4 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-});
+}));

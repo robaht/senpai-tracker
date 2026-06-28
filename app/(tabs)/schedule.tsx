@@ -217,7 +217,7 @@ function ScheduleSkeleton() {
   );
 }
 
-const useStyles = makeStyles(({ colors }) => ({
+const useStyles = makeStyles(({ colors, radii }) => ({
   headerWrap: {
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.md,
@@ -232,7 +232,7 @@ const useStyles = makeStyles(({ colors }) => ({
   pill: {
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
-    borderRadius: 999,
+    borderRadius: radii.pill,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surface,

@@ -37,7 +37,7 @@ const BOTTOM_SPACE = 110;
 export default function DiscoverScreen() {
   const { width } = useWindowDimensions();
   const router = useRouter();
-  const { colors, gradients } = useTheme();
+  const { colors, gradients, retro } = useTheme();
   const [query, setQuery] = useState('');
   const isSearching = query.trim().length >= 2;
 
@@ -156,7 +156,10 @@ export default function DiscoverScreen() {
                   colors={gradients.brand}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
-                  style={styles.forYouGradient}
+                  style={[
+                    styles.forYouGradient,
+                    retro && { borderRadius: 2, borderWidth: 3, borderColor: colors.borderStrong },
+                  ]}
                 >
                   <View style={styles.forYouIcon}>
                     <Ionicons name="sparkles" size={20} color={colors.onMedia} />

@@ -2,7 +2,7 @@ import { useRouter } from 'expo-router';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { View, StyleSheet } from 'react-native';
-import { radii, spacing, useTheme } from '../theme';
+import { spacing, makeStyles, useTheme } from '../theme';
 import { Text } from './ui/Text';
 import { Badge } from './ui/Badge';
 import { PressableScale } from './ui/PressableScale';
@@ -19,7 +19,8 @@ interface FeaturedCardProps {
  *  All foreground sits over artwork, so it uses the constant on-media tokens. */
 export function FeaturedCard({ media, width, rank }: FeaturedCardProps) {
   const router = useRouter();
-  const { colors, gradients } = useTheme();
+  const { colors, gradients, retro } = useTheme();
+  const styles = useStyles();
   const uri =
     media.bannerImage ?? media.coverImage?.extraLarge ?? media.coverImage?.large ?? undefined;
   const score = formatScore(media.averageScore);
@@ -35,7 +36,11 @@ export function FeaturedCard({ media, width, rank }: FeaturedCardProps) {
       <View
         style={[
           styles.card,
-          { backgroundColor: media.coverImage?.color ?? colors.surface, borderColor: colors.border },
+          retro && styles.cardRetro,
+          {
+            backgroundColor: media.coverImage?.color ?? colors.surface,
+            borderColor: retro ? colors.borderStrong : colors.border,
+          },
         ]}
       >
         <Image source={uri} style={StyleSheet.absoluteFill} contentFit="cover" transition={260} />
@@ -79,7 +84,7 @@ export function FeaturedCard({ media, width, rank }: FeaturedCardProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ radii }) => ({
   card: {
     width: '100%',
     aspectRatio: 16 / 10,
@@ -87,6 +92,9 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: StyleSheet.hairlineWidth,
     justifyContent: 'flex-end',
+  },
+  cardRetro: {
+    borderWidth: 3,
   },
   rankWrap: {
     position: 'absolute',
@@ -107,4 +115,4 @@ const styles = StyleSheet.create({
     gap: spacing.xs + 2,
     marginTop: 2,
   },
-});
+}));

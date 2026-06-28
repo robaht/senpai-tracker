@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
 import { Image } from 'expo-image';
 import { View, StyleSheet } from 'react-native';
-import { radii, spacing, useTheme } from '../theme';
+import { spacing, makeStyles, useTheme } from '../theme';
 import { Text } from './ui/Text';
 import { PressableScale } from './ui/PressableScale';
 import { ScoreBadge } from './ScoreBadge';
@@ -20,7 +20,8 @@ interface PosterCardProps {
 /** Poster tile: cover art + score + tracked indicator + title. The core list unit. */
 export function PosterCard({ media, width, hideTitle }: PosterCardProps) {
   const router = useRouter();
-  const { colors } = useTheme();
+  const { colors, retro } = useTheme();
+  const styles = useStyles();
   const entry = useTrackEntry(media.id);
   const uri = media.coverImage?.extraLarge ?? media.coverImage?.large ?? undefined;
 
@@ -34,7 +35,11 @@ export function PosterCard({ media, width, hideTitle }: PosterCardProps) {
       <View
         style={[
           styles.posterWrap,
-          { backgroundColor: media.coverImage?.color ?? colors.surface, borderColor: colors.border },
+          retro && styles.posterWrapRetro,
+          {
+            backgroundColor: media.coverImage?.color ?? colors.surface,
+            borderColor: retro ? colors.borderStrong : colors.border,
+          },
         ]}
       >
         <Image
@@ -65,13 +70,17 @@ export function PosterCard({ media, width, hideTitle }: PosterCardProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ radii }) => ({
   posterWrap: {
     width: '100%',
     aspectRatio: 2 / 3,
     borderRadius: radii.md,
     overflow: 'hidden',
     borderWidth: StyleSheet.hairlineWidth,
+  },
+  // Retro: a chunky navy frame around the (still full-color) cover art.
+  posterWrapRetro: {
+    borderWidth: 3,
   },
   poster: {
     width: '100%',
@@ -94,4 +103,4 @@ const styles = StyleSheet.create({
   title: {
     marginTop: spacing.sm,
   },
-});
+}));

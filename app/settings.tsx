@@ -25,8 +25,8 @@ import { usePreferencesStore, useRegion } from '../src/features/preferences/stor
 import { REGION_OPTIONS, regionLabel } from '../src/lib/streaming';
 import {
   THEME_LIST,
-  radii,
   spacing,
+  makeStyles,
   useTheme,
   type ThemeDef,
   type ThemeName,
@@ -38,6 +38,7 @@ export default function SettingsScreen() {
   const goBack = useGoBack();
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
+  const styles = useStyles();
   const scheme = useColorScheme();
   const { width } = useWindowDimensions();
 
@@ -282,6 +283,7 @@ export default function SettingsScreen() {
 
 function GroupHeader({ title, inUse }: { title: string; inUse: boolean }) {
   const { colors } = useTheme();
+  const styles = useStyles();
   return (
     <View style={styles.groupHeader}>
       <Text variant="overline" color="textFaint">
@@ -306,6 +308,7 @@ function ThemeCard({
   onPress: () => void;
 }) {
   const { colors } = useTheme();
+  const styles = useStyles();
   return (
     <PressableScale
       onPress={onPress}
@@ -357,6 +360,7 @@ function ThemeCard({
 
 /** A miniature of the app rendered entirely in the given theme's own palette. */
 function ThemePreview({ def, width }: { def: ThemeDef; width: number }) {
+  const styles = useStyles();
   const c = def.colors;
   const g = def.gradients;
   const h = Math.round(width * 0.74);
@@ -411,7 +415,7 @@ function ThemePreview({ def, width }: { def: ThemeDef; width: number }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ radii }) => ({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -550,4 +554,4 @@ const styles = StyleSheet.create({
     borderRadius: radii.pill,
     borderWidth: StyleSheet.hairlineWidth,
   },
-});
+}));

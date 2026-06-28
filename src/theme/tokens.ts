@@ -79,6 +79,82 @@ export const shadow = {
 } as const;
 
 // ---------------------------------------------------------------------------
+// Per-theme shape & type overrides.
+//
+// `radii`, `shadow` and `typography` above are the DEFAULTS used by every theme
+// unless its `ThemeDef` overrides them. Only the retro "Pixel RPG" theme does:
+// hard square corners, a blur-free offset shadow, and pixel fonts. Resolved at
+// runtime in ThemeContext so live theme switching flips corners + fonts too.
+// ---------------------------------------------------------------------------
+
+export type RadiiScale = Record<keyof typeof radii, number>;
+interface ShadowStyle {
+  shadowColor: string;
+  shadowOpacity: number;
+  shadowRadius: number;
+  shadowOffset: { width: number; height: number };
+  elevation: number;
+}
+export type ShadowSet = Record<keyof typeof shadow, ShadowStyle>;
+
+/** Hard square corners for the pixel theme — only a hair of rounding. */
+export const PIXEL_RADII: RadiiScale = {
+  sm: 2,
+  md: 2,
+  lg: 2,
+  xl: 3,
+  '2xl': 3,
+  pill: 3,
+};
+
+const PIXEL_NAVY = '#283C7C';
+
+/** Blur-free hard offset "block" shadow — the retro drop look. */
+export const PIXEL_SHADOW: ShadowSet = {
+  floating: {
+    shadowColor: PIXEL_NAVY,
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    shadowOffset: { width: 4, height: 4 },
+    elevation: 0,
+  },
+  card: {
+    shadowColor: PIXEL_NAVY,
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    shadowOffset: { width: 3, height: 3 },
+    elevation: 0,
+  },
+} as const;
+
+/** A resolved per-variant text style, and a partial per-theme override of it. */
+export interface TypeStyle {
+  fontFamily: string;
+  fontSize: number;
+  lineHeight: number;
+  letterSpacing?: number;
+}
+export type TypeScale = Record<TypographyVariant, TypeStyle>;
+export type TypeOverride = Partial<Record<TypographyVariant, TypeStyle>>;
+
+/**
+ * Hybrid pixel type for the retro theme: Silkscreen for headings/labels,
+ * Press Start 2P for tiny all-caps badges/overlines, and the more legible
+ * Pixelify Sans for long titles + body so anime names stay readable.
+ */
+const PIXEL_TYPE: TypeOverride = {
+  display: { fontFamily: 'SilkscreenBold', fontSize: 26, lineHeight: 32, letterSpacing: 0 },
+  title: { fontFamily: 'SilkscreenBold', fontSize: 19, lineHeight: 26, letterSpacing: 0 },
+  heading: { fontFamily: 'SilkscreenBold', fontSize: 15, lineHeight: 22, letterSpacing: 0 },
+  subheading: { fontFamily: 'PixelifySansBold', fontSize: 17, lineHeight: 23 },
+  body: { fontFamily: 'PixelifySans', fontSize: 16, lineHeight: 24 },
+  bodyMedium: { fontFamily: 'PixelifySansBold', fontSize: 16, lineHeight: 24 },
+  callout: { fontFamily: 'Silkscreen', fontSize: 13, lineHeight: 18, letterSpacing: 0 },
+  caption: { fontFamily: 'Silkscreen', fontSize: 11, lineHeight: 16, letterSpacing: 0 },
+  overline: { fontFamily: 'PressStart2P', fontSize: 8, lineHeight: 13, letterSpacing: 1 },
+};
+
+// ---------------------------------------------------------------------------
 // On-media tokens — IDENTICAL in every theme.
 //
 // These colors sit *over poster artwork* (banners, covers), which is always
@@ -274,6 +350,36 @@ const DAYLIGHT: Chrome = {
   skeletonHighlight: '#EEF2F9',
 };
 
+/**
+ * PIXEL — the retro "Pixel RPG" theme (GBA dialog-box look): powder-blue field,
+ * cream panels, navy double-borders, red/blue/gold/green accents. Full-color
+ * cover art still reads against it. Pairs with PIXEL_RADII/SHADOW/TYPE + retro
+ * dialog-box chrome on the shared primitives.
+ */
+const PIXEL: Chrome = {
+  bg: '#BBD2EA',
+  bgDeep: '#A6C2E0',
+  surface: '#F8F4E6',
+  surfaceElevated: '#FFFDF4',
+  surfaceHigh: '#E7DEC4',
+  border: 'rgba(40,60,124,0.28)',
+  borderStrong: '#283C7C',
+  text: '#26305C',
+  textMuted: '#54639C',
+  textFaint: '#8893BC',
+  textDisabled: '#AEB6D0',
+  accent: '#D83018',
+  accentSoft: '#A8240F',
+  accentAlt: '#3858C0',
+  onAccent: '#FFF7E6',
+  positive: '#2E9E3A',
+  warning: '#C0820C',
+  danger: '#C8281C',
+  info: '#2E78C8',
+  skeletonBase: '#E0D8C0',
+  skeletonHighlight: '#EFE8D4',
+};
+
 /** The full color set a theme exposes = its chrome + the constant on-media tokens. */
 export type ThemeColors = Chrome & typeof onMedia;
 export type ThemeGradients = GradientSet;
@@ -296,7 +402,7 @@ function brandGradients(
   };
 }
 
-export type ThemeName = 'midnight' | 'abyss' | 'sakura' | 'cozy' | 'daylight';
+export type ThemeName = 'midnight' | 'abyss' | 'sakura' | 'cozy' | 'daylight' | 'pixel';
 
 export interface ThemeDef {
   name: ThemeName;
@@ -306,6 +412,16 @@ export interface ThemeDef {
   isDark: boolean;
   colors: ThemeColors;
   gradients: ThemeGradients;
+  /**
+   * Optional shape/type overrides. Omitted by every standard theme (they use the
+   * default `radii`/`shadow`/`typography`); only the retro `pixel` theme sets
+   * them — squared corners, hard shadow, pixel fonts. `retro` flips the
+   * dialog-box treatment on shared primitives.
+   */
+  radii?: RadiiScale;
+  shadow?: ShadowSet;
+  type?: TypeOverride;
+  retro?: boolean;
 }
 
 export const themes: Record<ThemeName, ThemeDef> = {
@@ -349,6 +465,19 @@ export const themes: Record<ThemeName, ThemeDef> = {
     colors: buildColors(DAYLIGHT),
     gradients: brandGradients(['#5B5BF5', '#2BB7D4'], ['#5B5BF5', '#B14DE0'], '91,91,245'),
   },
+  pixel: {
+    name: 'pixel',
+    label: 'Pixel RPG',
+    blurb: 'Game Boy dialog boxes & pixel type',
+    isDark: false,
+    colors: buildColors(PIXEL),
+    // Near-flat brand pair so gradient surfaces read as solid retro fills.
+    gradients: brandGradients(['#D83018', '#E0482C'], ['#3858C0', '#2E78C8'], '216,48,24'),
+    radii: PIXEL_RADII,
+    shadow: PIXEL_SHADOW,
+    type: PIXEL_TYPE,
+    retro: true,
+  },
 };
 
 /** Ordered list for the theme gallery (darks first, then lights). */
@@ -358,6 +487,7 @@ export const THEME_LIST: ThemeDef[] = [
   themes.sakura,
   themes.cozy,
   themes.daylight,
+  themes.pixel,
 ];
 
 export const DEFAULT_THEME: ThemeName = 'midnight';

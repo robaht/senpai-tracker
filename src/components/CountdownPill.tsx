@@ -1,5 +1,5 @@
 import { View, StyleSheet } from 'react-native';
-import { radii, spacing, useTheme } from '../theme';
+import { spacing, makeStyles, useTheme } from '../theme';
 import { Text } from './ui/Text';
 import { withAlpha } from './ui/Badge';
 import { formatCountdown } from '../lib/format';
@@ -14,6 +14,7 @@ export function CountdownPill({
   compact?: boolean;
 }) {
   const { colors } = useTheme();
+  const styles = useStyles();
   const countdown = formatCountdown(next.timeUntilAiring);
   return (
     <View style={[styles.pill, { backgroundColor: withAlpha(colors.accent, 0.16) }]}>
@@ -27,7 +28,7 @@ export function CountdownPill({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ radii }) => ({
   pill: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -42,4 +43,4 @@ const styles = StyleSheet.create({
     height: 6,
     borderRadius: 3,
   },
-});
+}));

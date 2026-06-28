@@ -1,5 +1,5 @@
 import { View, TextInput, StyleSheet, Pressable } from 'react-native';
-import { radii, spacing, fonts, useTheme } from '../theme';
+import { spacing, makeStyles, useTheme } from '../theme';
 import { Text } from './ui/Text';
 
 interface SearchBarProps {
@@ -10,9 +10,10 @@ interface SearchBarProps {
 
 /** Rounded search field with a leading glyph and clear button. */
 export function SearchBar({ value, onChangeText, placeholder = 'Search anime…' }: SearchBarProps) {
-  const { colors } = useTheme();
+  const { colors, typography, retro } = useTheme();
+  const styles = useStyles();
   return (
-    <View style={[styles.wrap, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+    <View style={[styles.wrap, retro && styles.wrapRetro, { backgroundColor: colors.surface, borderColor: retro ? colors.borderStrong : colors.border }]}>
       <Text variant="subheading" color="textFaint" style={styles.icon}>
         ⌕
       </Text>
@@ -21,7 +22,10 @@ export function SearchBar({ value, onChangeText, placeholder = 'Search anime…'
         onChangeText={onChangeText}
         placeholder={placeholder}
         placeholderTextColor={colors.textFaint}
-        style={[styles.input, { color: colors.text }]}
+        style={[
+          styles.input,
+          { color: colors.text, fontFamily: typography.body.fontFamily, fontSize: typography.body.fontSize },
+        ]}
         autoCorrect={false}
         autoCapitalize="none"
         returnKeyType="search"
@@ -38,7 +42,7 @@ export function SearchBar({ value, onChangeText, placeholder = 'Search anime…'
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ radii }) => ({
   wrap: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -48,16 +52,17 @@ const styles = StyleSheet.create({
     height: 48,
     gap: spacing.sm,
   },
+  wrapRetro: {
+    borderWidth: 3,
+  },
   icon: {
     fontSize: 20,
   },
   input: {
     flex: 1,
-    fontFamily: fonts.medium,
-    fontSize: 15,
     height: '100%',
   },
   clear: {
     padding: 4,
   },
-});
+}));

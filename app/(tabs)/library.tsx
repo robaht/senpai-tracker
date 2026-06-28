@@ -17,7 +17,7 @@ import {
   statusColor,
   type WatchStatus,
 } from '../../src/features/tracking/types';
-import { radii, spacing, makeStyles, useTheme } from '../../src/theme';
+import { spacing, makeStyles, useTheme } from '../../src/theme';
 
 import type { TrackEntry } from '../../src/features/tracking/types';
 
@@ -232,7 +232,7 @@ function Chip({
   );
 }
 
-const useStyles = makeStyles(({ colors }) => ({
+const useStyles = makeStyles(({ colors, radii }) => ({
   headerWrap: {
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.md,
@@ -294,7 +294,7 @@ const useStyles = makeStyles(({ colors }) => ({
     gap: spacing.sm,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    borderRadius: 999,
+    borderRadius: radii.pill,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surface,
@@ -303,7 +303,7 @@ const useStyles = makeStyles(({ colors }) => ({
     minWidth: 22,
     paddingHorizontal: 6,
     paddingVertical: 1,
-    borderRadius: 999,
+    borderRadius: radii.pill,
     backgroundColor: colors.surfaceHigh,
     alignItems: 'center',
   },

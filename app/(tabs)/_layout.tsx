@@ -6,7 +6,7 @@ import { fonts, useTheme } from '../../src/theme';
 import { withAlpha } from '../../src/components/ui/Badge';
 
 export default function TabsLayout() {
-  const { colors, isDark } = useTheme();
+  const { colors, isDark, retro, typography } = useTheme();
 
   return (
     <Tabs
@@ -16,19 +16,29 @@ export default function TabsLayout() {
         tabBarInactiveTintColor: colors.textFaint,
         tabBarStyle: [
           styles.tabBar,
-          {
-            borderTopColor: colors.border,
-            // Translucent tint so the blur reads underneath on native; solid on web.
-            backgroundColor:
-              Platform.OS === 'web'
-                ? colors.bgDeep
-                : withAlpha(colors.bg, isDark ? 0.62 : 0.8),
-          },
+          retro
+            ? {
+                // Retro: a solid cream bar with a hard navy top edge — no blur.
+                borderTopColor: colors.borderStrong,
+                borderTopWidth: 3,
+                backgroundColor: colors.surface,
+              }
+            : {
+                borderTopColor: colors.border,
+                // Translucent tint so the blur reads underneath on native; solid on web.
+                backgroundColor:
+                  Platform.OS === 'web'
+                    ? colors.bgDeep
+                    : withAlpha(colors.bg, isDark ? 0.62 : 0.8),
+              },
         ],
-        tabBarLabelStyle: styles.label,
+        tabBarLabelStyle: [
+          styles.label,
+          retro && { fontFamily: typography.caption.fontFamily, fontSize: 9 },
+        ],
         tabBarItemStyle: styles.item,
         tabBarBackground:
-          Platform.OS === 'web'
+          Platform.OS === 'web' || retro
             ? undefined
             : () => (
                 <BlurView

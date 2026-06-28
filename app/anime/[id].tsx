@@ -1,8 +1,7 @@
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import {
   View,
   StyleSheet,
-  Pressable,
   useWindowDimensions,
 } from 'react-native';
 import { useLocalSearchParams, useNavigation } from 'expo-router';
@@ -13,6 +12,7 @@ import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, {
+  LinearTransition,
   interpolate,
   useAnimatedScrollHandler,
   useAnimatedStyle,
@@ -20,9 +20,9 @@ import Animated, {
 } from 'react-native-reanimated';
 import { Text } from '../../src/components/ui/Text';
 import { Card } from '../../src/components/ui/Card';
-import { Badge } from '../../src/components/ui/Badge';
 import { Button } from '../../src/components/ui/Button';
 import { Skeleton } from '../../src/components/ui/Skeleton';
+import { PressableScale } from '../../src/components/ui/PressableScale';
 import { withAlpha } from '../../src/components/ui/Badge';
 import { CountdownPill } from '../../src/components/CountdownPill';
 import { AddToListSheet } from '../../src/components/AddToListSheet';
@@ -39,7 +39,7 @@ import { useTrackEntry, useTrackingStore } from '../../src/features/tracking/sto
 import { useComfortStore, useIsComfort } from '../../src/features/comfort/store';
 import { STATUS_META, statusColor } from '../../src/features/tracking/types';
 import { formatScore, humanizeEnum, stripHtml } from '../../src/lib/format';
-import { radii, spacing, makeStyles, useTheme } from '../../src/theme';
+import { radii, spacing, motion, makeStyles, useTheme } from '../../src/theme';
 
 export default function AnimeDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -63,7 +63,9 @@ export default function AnimeDetailScreen() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [descExpanded, setDescExpanded] = useState(false);
 
-  const bannerHeight = Math.min(width * 0.62, 320);
+  // A tall, cinematic hero — the cover art is the focal point and the title sits
+  // in its fade-out, so it needs room to breathe.
+  const bannerHeight = Math.min(width * 0.95, 440);
 
   // Scroll drives the parallax banner and the fade-in title bar.
   const scrollY = useSharedValue(0);
@@ -94,9 +96,22 @@ export default function AnimeDetailScreen() {
     ),
   }));
 
-  // Fade the art into the active theme's background so the banner blends into
-  // the content surface in every theme (dark fades to ink, light to cream/white).
-  const bannerFade = ['transparent', withAlpha(colors.bg, 0.55), colors.bg] as const;
+  // Dissolve the art smoothly into the active theme's background — a long,
+  // multi-stop scrim that's fully transparent over the top of the art and reaches
+  // the solid background low down, where the title sits. No hard banner edge.
+  const bannerFade = [
+    'transparent',
+    'transparent',
+    withAlpha(colors.bg, 0.55),
+    withAlpha(colors.bg, 0.92),
+    colors.bg,
+  ] as const;
+  const bannerFadeStops = [0, 0.4, 0.68, 0.86, 1] as const;
+
+  // Smoothly reflow blocks below when the synopsis expands. Layout animations
+  // degrade gracefully (an instant resize) if they don't run, so unlike entrance
+  // animations they can never leave content stuck invisible.
+  const reflow = LinearTransition.duration(motion.duration.base).easing(motion.easing.inOut);
 
   return (
     <View style={styles.root}>
@@ -122,7 +137,11 @@ export default function AnimeDetailScreen() {
               transition={300}
             />
           )}
-          <LinearGradient colors={bannerFade} style={StyleSheet.absoluteFill} />
+          <LinearGradient
+            colors={bannerFade}
+            locations={bannerFadeStops}
+            style={StyleSheet.absoluteFill}
+          />
         </Animated.View>
 
         {isLoading ? (
@@ -131,43 +150,29 @@ export default function AnimeDetailScreen() {
           <EmptyState emoji="😵" title="Couldn't load this title" subtitle="Please try again later." />
         ) : (
           <View style={styles.content}>
-            {/* Poster + title header */}
-            <View style={styles.headRow}>
-              <View style={[styles.posterWrap, { backgroundColor: media.coverImage?.color ?? colors.surface }]}>
-                <Image
-                  source={media.coverImage?.extraLarge ?? media.coverImage?.large ?? undefined}
-                  style={styles.poster}
-                  contentFit="cover"
-                  transition={250}
-                />
-              </View>
-              <View style={styles.headInfo}>
-                <Text variant="title" numberOfLines={3}>
-                  {displayTitle(media.title)}
+            {/* Cinematic title block — sits in the banner's fade-out. Uses theme
+                text colors (not on-media white) because by this depth the art has
+                dissolved to the page background, so it reads in every theme. */}
+            <View style={styles.hero}>
+              <Text variant="display" numberOfLines={2} style={styles.heroTitle}>
+                {displayTitle(media.title)}
+              </Text>
+              {media.title.native && (
+                <Text variant="caption" color="textMuted" numberOfLines={1}>
+                  {media.title.native}
                 </Text>
-                {media.title.native && (
-                  <Text variant="caption" color="textFaint" numberOfLines={1}>
-                    {media.title.native}
-                  </Text>
-                )}
-                <View style={styles.metaRow}>
-                  {formatScore(media.averageScore) && (
-                    <Text variant="callout" color={colors.warning}>
-                      ★ {formatScore(media.averageScore)}
-                    </Text>
-                  )}
-                  {media.format && (
-                    <Text variant="callout" color="textMuted">
-                      {humanizeEnum(media.format)}
-                    </Text>
-                  )}
-                  {media.episodes != null && (
-                    <Text variant="callout" color="textMuted">
-                      {media.episodes} eps
-                    </Text>
-                  )}
-                </View>
-              </View>
+              )}
+              <MetaRow
+                score={formatScore(media.averageScore)}
+                format={media.format}
+                episodes={media.episodes}
+                year={media.seasonYear}
+              />
+              {media.genres.length > 0 && (
+                <Text variant="callout" color="textFaint" numberOfLines={1} style={styles.heroGenres}>
+                  {media.genres.slice(0, 4).join('   ·   ')}
+                </Text>
+              )}
             </View>
 
             {media.nextAiringEpisode && (
@@ -205,14 +210,13 @@ export default function AnimeDetailScreen() {
               style={styles.comfortBtn}
             />
 
-            {/* Genres */}
-            {media.genres.length > 0 && (
-              <View style={styles.genres}>
-                {media.genres.map((g) => (
-                  <Badge key={g} label={g} color={colors.accentSoft} />
-                ))}
-              </View>
-            )}
+            {/* Headline stats — a calm strip that replaces the old spec-sheet table */}
+            <StatStrip
+              score={formatScore(media.averageScore)}
+              episodes={media.episodes}
+              format={media.format}
+              year={media.seasonYear}
+            />
 
             {/* Trailer (renders nothing when there's no playable trailer) */}
             <TrailerCard trailer={media.trailer} />
@@ -220,9 +224,10 @@ export default function AnimeDetailScreen() {
             {/* Where to watch — region-aware streaming links */}
             <StreamingLinks links={media.externalLinks} />
 
-            {/* Synopsis */}
+            {/* Synopsis. `layout` smoothly animates the height when "Read more"
+                toggles; it degrades to an instant resize if it doesn't run. */}
             {media.description && (
-              <View style={styles.section}>
+              <Animated.View layout={reflow} style={styles.section}>
                 <Text variant="heading" style={styles.sectionTitle}>
                   Synopsis
                 </Text>
@@ -233,40 +238,48 @@ export default function AnimeDetailScreen() {
                 >
                   {stripHtml(media.description)}
                 </Text>
-                <Pressable onPress={() => setDescExpanded((v) => !v)} hitSlop={8}>
+                <PressableScale onPress={() => setDescExpanded((v) => !v)} hitSlop={8}>
                   <Text variant="callout" color={colors.accent} style={styles.readMore}>
                     {descExpanded ? 'Show less' : 'Read more'}
                   </Text>
-                </Pressable>
-              </View>
+                </PressableScale>
+              </Animated.View>
             )}
 
             {/* Info card */}
-            <Card style={styles.section}>
-              <InfoRow label="Status" value={humanizeEnum(media.status) || '—'} />
-              {media.studios?.nodes?.length ? (
-                <InfoRow label="Studio" value={media.studios.nodes.map((s) => s.name).join(', ')} />
-              ) : null}
-              {media.season && media.seasonYear ? (
-                <InfoRow
-                  label="Season"
-                  value={`${media.season.charAt(0) + media.season.slice(1).toLowerCase()} ${media.seasonYear}`}
-                />
-              ) : null}
-              {media.duration ? <InfoRow label="Episode length" value={`${media.duration} min`} /> : null}
-              {media.popularity ? (
-                <InfoRow label="Popularity" value={`#${media.popularity.toLocaleString()}`} last />
-              ) : null}
-            </Card>
+            <Animated.View layout={reflow}>
+              <Card style={styles.section}>
+                <InfoRow label="Status" value={humanizeEnum(media.status) || '—'} />
+                {media.studios?.nodes?.length ? (
+                  <InfoRow label="Studio" value={media.studios.nodes.map((s) => s.name).join(', ')} />
+                ) : null}
+                {media.season && media.seasonYear ? (
+                  <InfoRow
+                    label="Season"
+                    value={`${media.season.charAt(0) + media.season.slice(1).toLowerCase()} ${media.seasonYear}`}
+                  />
+                ) : null}
+                {media.duration ? <InfoRow label="Episode length" value={`${media.duration} min`} /> : null}
+                {media.popularity ? (
+                  <InfoRow label="Popularity" value={`#${media.popularity.toLocaleString()}`} last />
+                ) : null}
+              </Card>
+            </Animated.View>
 
             {/* Cast — tap a character for role + voice actor */}
-            <CharacterRail media={media} />
+            <Animated.View layout={reflow}>
+              <CharacterRail media={media} />
+            </Animated.View>
 
             {/* Related anime / season chain */}
-            <RelationsRail media={media} />
+            <Animated.View layout={reflow}>
+              <RelationsRail media={media} />
+            </Animated.View>
 
             {/* "More like this" — community recommendations */}
-            <RecommendationsRail mediaId={media.id} />
+            <Animated.View layout={reflow}>
+              <RecommendationsRail mediaId={media.id} />
+            </Animated.View>
           </View>
         )}
       </Animated.ScrollView>
@@ -293,31 +306,142 @@ export default function AnimeDetailScreen() {
         </View>
       </Animated.View>
 
-      {/* Floating back button */}
-      <Pressable
+      {/* Floating back button — frosted glass over the artwork */}
+      <PressableScale
         onPress={goBack}
-        style={[styles.backBtn, { backgroundColor: colors.mediaBorder, top: insets.top + spacing.sm }]}
+        style={[styles.backBtn, { top: insets.top + spacing.sm }]}
         hitSlop={8}
         accessibilityRole="button"
         accessibilityLabel="Go back"
       >
-        <Ionicons name="chevron-back" size={24} color={colors.onMedia} />
-      </Pressable>
+        <GlassChip>
+          <Ionicons name="chevron-back" size={24} color={colors.onMedia} />
+        </GlassChip>
+      </PressableScale>
 
       {/* Floating home button — collapses a deep anime→anime chain in one tap */}
       {showHome && (
-        <Pressable
+        <PressableScale
           onPress={goHome}
-          style={[styles.homeBtn, { backgroundColor: colors.mediaBorder, top: insets.top + spacing.sm }]}
+          style={[styles.homeBtn, { top: insets.top + spacing.sm }]}
           hitSlop={8}
           accessibilityRole="button"
           accessibilityLabel="Back to home"
         >
-          <Ionicons name="home" size={20} color={colors.onMedia} />
-        </Pressable>
+          <GlassChip>
+            <Ionicons name="home" size={20} color={colors.onMedia} />
+          </GlassChip>
+        </PressableScale>
       )}
 
       <AddToListSheet media={media ?? null} visible={sheetOpen} onClose={() => setSheetOpen(false)} />
+    </View>
+  );
+}
+
+/** A frosted-glass circular chip — the floating nav buttons over the artwork.
+ *  Stays a constant dark glass in every theme so the icon reads over any cover. */
+function GlassChip({ children }: { children: React.ReactNode }) {
+  const { colors } = useTheme();
+  return (
+    <>
+      <BlurView intensity={24} tint="dark" style={StyleSheet.absoluteFill} />
+      <View
+        style={[
+          StyleSheet.absoluteFill,
+          { backgroundColor: colors.mediaBorder, borderColor: 'rgba(255,255,255,0.14)', borderWidth: StyleSheet.hairlineWidth, borderRadius: 20 },
+        ]}
+      />
+      {children}
+    </>
+  );
+}
+
+/** Score · format · episode · year meta, joined by hairline dots. */
+function MetaRow({
+  score,
+  format,
+  episodes,
+  year,
+}: {
+  score: string | null | undefined;
+  format?: string | null;
+  episodes?: number | null;
+  year?: number | null;
+}) {
+  const { colors } = useTheme();
+  const styles = useStyles();
+  const parts: React.ReactNode[] = [];
+  if (score) {
+    parts.push(
+      <Text key="score" variant="callout" color={colors.warning}>
+        ★ {score}
+      </Text>,
+    );
+  }
+  if (format) {
+    parts.push(
+      <Text key="format" variant="callout" color="textMuted">
+        {humanizeEnum(format)}
+      </Text>,
+    );
+  }
+  if (episodes != null) {
+    parts.push(
+      <Text key="eps" variant="callout" color="textMuted">
+        {episodes} eps
+      </Text>,
+    );
+  }
+  if (year) {
+    parts.push(
+      <Text key="year" variant="callout" color="textMuted">
+        {year}
+      </Text>,
+    );
+  }
+  if (parts.length === 0) return null;
+  return (
+    <View style={styles.metaRow}>
+      {parts.map((node, i) => (
+        <Fragment key={i}>
+          {i > 0 && <View style={styles.metaDot} />}
+          {node}
+        </Fragment>
+      ))}
+    </View>
+  );
+}
+
+/** A calm horizontal strip of headline stats — replaces the spec-sheet table. */
+function StatStrip({
+  score,
+  episodes,
+  format,
+  year,
+}: {
+  score: string | null | undefined;
+  episodes?: number | null;
+  format?: string | null;
+  year?: number | null;
+}) {
+  const styles = useStyles();
+  const cells: { label: string; value: string }[] = [];
+  if (score) cells.push({ label: 'Score', value: score });
+  if (episodes != null) cells.push({ label: 'Episodes', value: String(episodes) });
+  if (format) cells.push({ label: 'Format', value: humanizeEnum(format) });
+  if (year) cells.push({ label: 'Year', value: String(year) });
+  if (cells.length < 2) return null;
+  return (
+    <View style={styles.statStrip}>
+      {cells.map((c, i) => (
+        <View key={c.label} style={[styles.statCell, i > 0 && styles.statDivider]}>
+          <Text variant="subheading">{c.value}</Text>
+          <Text variant="caption" color="textFaint" style={styles.statLabel}>
+            {c.label}
+          </Text>
+        </View>
+      ))}
     </View>
   );
 }
@@ -342,35 +466,35 @@ function TrackingPanel({
 
   return (
     <Card elevated style={styles.panel}>
-      <Pressable style={styles.panelStatus} onPress={onChangeStatus}>
+      <PressableScale style={styles.panelStatus} onPress={onChangeStatus}>
         <View style={[styles.statusDot, { backgroundColor: statusColor(colors, entry.status) }]} />
         <Text variant="subheading">{meta.label}</Text>
         <Ionicons name="chevron-down" size={16} color={colors.textFaint} style={styles.panelChevron} />
-      </Pressable>
+      </PressableScale>
 
       <View style={styles.stepper}>
-        <Pressable
+        <PressableScale
           onPress={() => setProgress(mediaId, entry.progress - 1)}
           disabled={entry.progress <= 0}
           style={[styles.stepBtn, entry.progress <= 0 && styles.stepDisabled]}
           hitSlop={6}
         >
           <Ionicons name="remove" size={20} color={colors.text} />
-        </Pressable>
+        </PressableScale>
         <View style={styles.stepCount}>
           <Text variant="heading">{entry.progress}</Text>
           <Text variant="caption" color="textFaint">
             {entry.totalEpisodes ? `of ${entry.totalEpisodes}` : 'episodes'}
           </Text>
         </View>
-        <Pressable
+        <PressableScale
           onPress={() => increment(mediaId)}
           disabled={atMax}
           style={[styles.stepBtn, styles.stepBtnPrimary, atMax && styles.stepDisabled]}
           hitSlop={6}
         >
           <Ionicons name="add" size={20} color={colors.onAccent} />
-        </Pressable>
+        </PressableScale>
       </View>
 
       <View style={styles.panelDivider} />
@@ -383,8 +507,8 @@ function InfoRow({ label, value, last }: { label: string; value: string; last?: 
   const styles = useStyles();
   return (
     <View style={[styles.infoRow, !last && styles.infoBorder]}>
-      <Text variant="callout" color="textFaint">
-        {label}
+      <Text variant="overline" color="textFaint">
+        {label.toUpperCase()}
       </Text>
       <Text variant="callout" style={styles.infoValue} numberOfLines={2}>
         {value}
@@ -397,52 +521,45 @@ function DetailSkeleton() {
   const styles = useStyles();
   return (
     <View style={styles.content}>
-      <View style={styles.headRow}>
-        <Skeleton width={108} height={162} radius={radii.md} />
-        <View style={styles.headInfo}>
-          <Skeleton width="90%" height={24} />
-          <Skeleton width="50%" height={14} />
-          <Skeleton width="70%" height={14} />
-        </View>
+      <View style={styles.hero}>
+        <Skeleton width="75%" height={32} />
+        <Skeleton width="45%" height={14} />
+        <Skeleton width="60%" height={14} />
       </View>
       <Skeleton width="100%" height={50} radius={radii.md} style={{ marginTop: spacing.xl }} />
-      <Skeleton width="100%" height={120} radius={radii.lg} style={{ marginTop: spacing.xl }} />
+      <Skeleton width="100%" height={72} radius={radii.lg} style={{ marginTop: spacing.xl }} />
     </View>
   );
 }
 
-const useStyles = makeStyles(({ colors }) => ({
+const useStyles = makeStyles(({ colors, radii }) => ({
   root: { flex: 1, backgroundColor: colors.bg },
   scroll: { paddingBottom: spacing['5xl'] },
   banner: { width: '100%' },
   content: {
     paddingHorizontal: spacing.xl,
-    marginTop: -64, // pull poster up over the banner
+    marginTop: -110, // pull the title block up into the banner's fade-out
   },
-  headRow: {
-    flexDirection: 'row',
-    gap: spacing.lg,
-    alignItems: 'flex-end',
-  },
-  posterWrap: {
-    width: 108,
-    height: 162,
-    borderRadius: radii.md,
-    overflow: 'hidden',
-    borderWidth: 2,
-    borderColor: colors.bg,
-  },
-  poster: { width: '100%', height: '100%' },
-  headInfo: {
-    flex: 1,
+  hero: {
     gap: 6,
-    paddingBottom: spacing.xs,
+  },
+  heroTitle: {
+    marginBottom: 2,
+  },
+  heroGenres: {
+    marginTop: spacing.xs,
   },
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
+    gap: spacing.sm,
     marginTop: 2,
+  },
+  metaDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: colors.textFaint,
   },
   airing: { marginTop: spacing.lg },
   addBtn: { marginTop: spacing.xl },
@@ -475,18 +592,32 @@ const useStyles = makeStyles(({ colors }) => ({
   stepBtnPrimary: { backgroundColor: colors.accent },
   stepDisabled: { opacity: 0.4 },
   stepCount: { alignItems: 'center', gap: 2 },
-  genres: {
+  statStrip: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
     marginTop: spacing.xl,
+    backgroundColor: colors.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    borderRadius: radii.lg,
+    paddingVertical: spacing.md,
   },
+  statCell: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 3,
+  },
+  statDivider: {
+    borderLeftWidth: StyleSheet.hairlineWidth,
+    borderLeftColor: colors.border,
+  },
+  statLabel: { marginTop: 1 },
   section: { marginTop: spacing['2xl'] },
   sectionTitle: { marginBottom: spacing.sm },
   readMore: { marginTop: spacing.sm },
   infoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
     gap: spacing.lg,
     paddingVertical: spacing.md,
   },
@@ -515,6 +646,7 @@ const useStyles = makeStyles(({ colors }) => ({
     width: 40,
     height: 40,
     borderRadius: 20,
+    overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -524,6 +656,7 @@ const useStyles = makeStyles(({ colors }) => ({
     width: 40,
     height: 40,
     borderRadius: 20,
+    overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
   },

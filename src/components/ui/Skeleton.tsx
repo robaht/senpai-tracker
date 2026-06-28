@@ -7,7 +7,7 @@ import Animated, {
   withTiming,
   Easing,
 } from 'react-native-reanimated';
-import { radii, useTheme } from '../../theme';
+import { useTheme } from '../../theme';
 
 interface SkeletonProps {
   width?: DimensionValue;
@@ -17,8 +17,9 @@ interface SkeletonProps {
 }
 
 /** A pulsing placeholder block shown while content loads. */
-export function Skeleton({ width = '100%', height = 16, radius = radii.sm, style }: SkeletonProps) {
-  const { colors } = useTheme();
+export function Skeleton({ width = '100%', height = 16, radius, style }: SkeletonProps) {
+  const { colors, radii } = useTheme();
+  const r = radius ?? radii.sm;
   const opacity = useSharedValue(0.5);
 
   useEffect(() => {
@@ -34,7 +35,7 @@ export function Skeleton({ width = '100%', height = 16, radius = radii.sm, style
   return (
     <Animated.View
       style={[
-        { backgroundColor: colors.skeletonBase, width, height, borderRadius: radius },
+        { backgroundColor: colors.skeletonBase, width, height, borderRadius: r },
         animatedStyle,
         style,
       ]}

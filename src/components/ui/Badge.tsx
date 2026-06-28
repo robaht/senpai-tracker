@@ -1,5 +1,5 @@
 import { View, StyleSheet, ViewStyle } from 'react-native';
-import { radii, spacing, useTheme } from '../../theme';
+import { spacing, makeStyles, useTheme } from '../../theme';
 import { Text } from './Text';
 
 interface BadgeProps {
@@ -21,6 +21,7 @@ interface BadgeProps {
 /** Compact pill label — used for genres, formats, scores, statuses. */
 export function Badge({ label, color, variant = 'tinted', icon, style }: BadgeProps) {
   const { colors } = useTheme();
+  const styles = useStyles();
   const tint = color ?? colors.textMuted;
   const isSolid = variant === 'solid';
   const isOutline = variant === 'outline';
@@ -59,7 +60,7 @@ export function withAlpha(color: string, alpha: number): string {
   return color;
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ radii }) => ({
   badge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -72,4 +73,4 @@ const styles = StyleSheet.create({
   labelWithIcon: {
     marginLeft: 2,
   },
-});
+}));

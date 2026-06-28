@@ -1,7 +1,7 @@
 import { ReactNode } from 'react';
 import { StyleSheet, View, ViewStyle, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { radii, spacing, useTheme } from '../../theme';
+import { spacing, makeStyles, useTheme } from '../../theme';
 import { Text } from './Text';
 import { PressableScale } from './PressableScale';
 
@@ -33,6 +33,7 @@ export function Button({
   style,
 }: ButtonProps) {
   const { colors, gradients } = useTheme();
+  const styles = useStyles();
   const fg = variant === 'primary' ? colors.onAccent : colors.text;
 
   const content = (
@@ -89,7 +90,7 @@ export function Button({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ radii }) => ({
   base: {
     height: 50,
     borderRadius: radii.md,
@@ -108,4 +109,4 @@ const styles = StyleSheet.create({
   fullWidth: { width: '100%' },
   shrink: { alignSelf: 'flex-start' },
   disabled: { opacity: 0.5 },
-});
+}));

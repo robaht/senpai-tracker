@@ -1,14 +1,13 @@
 import { ReactNode, useEffect, useRef, useState } from 'react';
 import { Modal, Pressable, View, StyleSheet } from 'react-native';
 import Animated, {
-  Easing,
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { radii, spacing, useTheme } from '../../theme';
+import { motion, spacing, makeStyles, useMotion, useTheme } from '../../theme';
 
 interface BottomSheetProps {
   visible: boolean;
@@ -36,7 +35,9 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
  */
 export function BottomSheet({ visible, onClose, children }: BottomSheetProps) {
   const insets = useSafeAreaInsets();
-  const { colors } = useTheme();
+  const { colors, retro } = useTheme();
+  const { reduced } = useMotion();
+  const styles = useStyles();
 
   const [mounted, setMounted] = useState(visible);
   const progress = useSharedValue(0);
@@ -47,12 +48,17 @@ export function BottomSheet({ visible, onClose, children }: BottomSheetProps) {
     if (visible) {
       wasOpen.current = true;
       setMounted(true);
-      progress.value = withTiming(1, { duration: 280, easing: Easing.out(Easing.cubic) });
+      // Open with the iOS drawer curve; close faster than it opens (exits should
+      // never linger). Both layers share this progress value.
+      progress.value = withTiming(1, {
+        duration: motion.duration.slow,
+        easing: motion.easing.drawer,
+      });
     } else if (wasOpen.current) {
       wasOpen.current = false;
       progress.value = withTiming(
         0,
-        { duration: 200, easing: Easing.in(Easing.cubic) },
+        { duration: motion.duration.exit, easing: motion.easing.out },
         (finished) => {
           if (finished) runOnJS(setMounted)(false);
         },
@@ -61,8 +67,10 @@ export function BottomSheet({ visible, onClose, children }: BottomSheetProps) {
   }, [visible, progress]);
 
   const backdropStyle = useAnimatedStyle(() => ({ opacity: progress.value }));
+  // Under reduced motion the card fades with the scrim instead of sliding.
   const sheetStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: (1 - progress.value) * sheetH.value }],
+    opacity: reduced ? progress.value : 1,
+    transform: [{ translateY: reduced ? 0 : (1 - progress.value) * sheetH.value }],
   }));
 
   return (
@@ -75,6 +83,7 @@ export function BottomSheet({ visible, onClose, children }: BottomSheetProps) {
           }}
           style={[
             styles.sheet,
+            retro && styles.sheetRetro,
             sheetStyle,
             {
               backgroundColor: colors.surfaceElevated,
@@ -91,7 +100,7 @@ export function BottomSheet({ visible, onClose, children }: BottomSheetProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ radii }) => ({
   backdrop: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.6)',
@@ -107,6 +116,12 @@ const styles = StyleSheet.create({
     paddingTop: spacing.md,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
+  // Retro: a hard dialog-box edge — thick navy border on three sides.
+  sheetRetro: {
+    borderTopWidth: 3,
+    borderLeftWidth: 3,
+    borderRightWidth: 3,
+  },
   handle: {
     alignSelf: 'center',
     width: 40,
@@ -114,4 +129,4 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     marginBottom: spacing.lg,
   },
-});
+}));

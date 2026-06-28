@@ -1,5 +1,5 @@
 import { View, StyleSheet } from 'react-native';
-import { radii, useTheme } from '../theme';
+import { makeStyles, useTheme } from '../theme';
 import { Text } from './ui/Text';
 import { formatScore } from '../lib/format';
 
@@ -7,6 +7,7 @@ import { formatScore } from '../lib/format';
  *  uses the constant on-media tokens (legible in light themes too). */
 export function ScoreBadge({ averageScore }: { averageScore: number | null }) {
   const { colors } = useTheme();
+  const styles = useStyles();
   const score = formatScore(averageScore);
   if (!score) return null;
   return (
@@ -21,7 +22,7 @@ export function ScoreBadge({ averageScore }: { averageScore: number | null }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ radii }) => ({
   badge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -30,4 +31,4 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: radii.sm,
   },
-});
+}));

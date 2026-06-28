@@ -13,6 +13,12 @@ import {
   PlusJakartaSans_700Bold,
   PlusJakartaSans_800ExtraBold,
 } from '@expo-google-fonts/plus-jakarta-sans';
+import { PressStart2P_400Regular } from '@expo-google-fonts/press-start-2p';
+import { Silkscreen_400Regular, Silkscreen_700Bold } from '@expo-google-fonts/silkscreen';
+import {
+  PixelifySans_400Regular,
+  PixelifySans_600SemiBold,
+} from '@expo-google-fonts/pixelify-sans';
 import { QueryProvider } from '../src/providers/QueryProvider';
 import { useTrackingStore } from '../src/features/tracking/store';
 import { useComfortStore } from '../src/features/comfort/store';
@@ -33,6 +39,12 @@ export default function RootLayout() {
     Jakarta_600: PlusJakartaSans_600SemiBold,
     Jakarta_700: PlusJakartaSans_700Bold,
     Jakarta_800: PlusJakartaSans_800ExtraBold,
+    // Pixel/retro theme faces (hybrid: blocky for labels, legible for body).
+    PressStart2P: PressStart2P_400Regular,
+    Silkscreen: Silkscreen_400Regular,
+    SilkscreenBold: Silkscreen_700Bold,
+    PixelifySans: PixelifySans_400Regular,
+    PixelifySansBold: PixelifySans_600SemiBold,
   });
 
   // Load persisted state into memory once at startup.
