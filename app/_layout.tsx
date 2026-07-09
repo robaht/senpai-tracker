@@ -27,6 +27,8 @@ import { useDismissedStore } from '../src/features/recommendations/store';
 import { useAuthStore } from '../src/features/auth/store';
 import { pullAndReconcile } from '../src/features/tracking/sync';
 import { useSyncStore } from '../src/features/tracking/syncStore';
+import { useNotificationStore } from '../src/features/notifications/store';
+import { runNotificationDetection } from '../src/features/notifications/detect';
 import { ThemeProvider, useTheme } from '../src/theme';
 
 // Closes the OAuth popup and delivers the redirect result on web (F1).
@@ -55,20 +57,31 @@ export default function RootLayout() {
   const hydrateAuth = useAuthStore((s) => s.hydrate);
   const authStatus = useAuthStore((s) => s.status);
   const prefsHydrated = usePreferencesStore((s) => s.hydrated);
+  const hydrateNotifications = useNotificationStore((s) => s.hydrate);
   useEffect(() => {
     void hydrateTracking();
     void hydrateComfort();
     void hydratePrefs();
     void hydrateDismissed();
     void hydrateAuth();
+    void hydrateNotifications();
     void useSyncStore.getState().hydrate();
-  }, [hydrateTracking, hydrateComfort, hydratePrefs, hydrateDismissed, hydrateAuth]);
+  }, [hydrateTracking, hydrateComfort, hydratePrefs, hydrateDismissed, hydrateAuth, hydrateNotifications]);
 
   // Once signed in (on sign-in or an authed app-start), pull + reconcile the
   // AniList list. Guarded against overlap inside `pullAndReconcile`.
   useEffect(() => {
     if (authStatus === 'signedIn') void pullAndReconcile();
   }, [authStatus]);
+
+  // Once both the tracking list and the notification store are hydrated, run a
+  // (throttled) detection pass — fire-and-forget, same style as the
+  // `pullAndReconcile()` effect above. Must not block `ready`/first paint.
+  const trackingHydrated = useTrackingStore((s) => s.hydrated);
+  const notificationsHydrated = useNotificationStore((s) => s.hydrated);
+  useEffect(() => {
+    if (trackingHydrated && notificationsHydrated) void runNotificationDetection();
+  }, [trackingHydrated, notificationsHydrated]);
 
   // Gate on prefs too, so a saved light theme doesn't flash the dark default.
   const ready = fontsLoaded && prefsHydrated;
@@ -107,6 +120,7 @@ function RootNavigator({ ready }: { ready: boolean }) {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="anime/[id]" options={{ animation: 'slide_from_bottom' }} />
         <Stack.Screen name="settings" options={{ animation: 'slide_from_bottom' }} />
+        <Stack.Screen name="notifications" options={{ animation: 'slide_from_bottom' }} />
         <Stack.Screen name="stats" options={{ animation: 'slide_from_bottom' }} />
         <Stack.Screen name="wrapped" options={{ animation: 'fade' }} />
         <Stack.Screen name="comfort" options={{ animation: 'slide_from_bottom' }} />

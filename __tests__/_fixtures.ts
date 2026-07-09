@@ -5,6 +5,7 @@ import type {
   MediaRelationType,
 } from '../src/api/anilist/types';
 import type { TrackEntry } from '../src/features/tracking/types';
+import type { AppNotification, NotificationSnapshot } from '../src/features/notifications/types';
 
 /** Minimal `Media` for tests — only the fields the logic under test reads. */
 export function media(id: number, over: Partial<Media> = {}): Media {
@@ -52,4 +53,31 @@ export function relationEdge(
 
 export function link(site: string, over: Partial<ExternalLink> = {}): ExternalLink {
   return { id: Math.floor(Math.random() * 1e6), url: `https://${site}.test`, site, language: null, ...over } as ExternalLink;
+}
+
+export function notification(id: string, over: Partial<AppNotification> = {}): AppNotification {
+  return {
+    id,
+    type: 'new-episode',
+    mediaId: 1,
+    title: 'Title 1',
+    coverImage: null,
+    message: 'Episode 1 is out',
+    episode: 1,
+    episodeCount: 1,
+    createdAt: 1000,
+    read: false,
+    ...over,
+  };
+}
+
+export function snapshot(mediaId: number, over: Partial<NotificationSnapshot> = {}): NotificationSnapshot {
+  return {
+    mediaId,
+    releasedEpisodes: 0,
+    knownSequelIds: [],
+    initialized: true,
+    lastCheckedAt: 1000,
+    ...over,
+  };
 }

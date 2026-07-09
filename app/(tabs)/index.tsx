@@ -28,6 +28,7 @@ import { PosterCard } from '../../src/components/PosterCard';
 import { EmptyState } from '../../src/components/EmptyState';
 import { useSeasonal, useTrending, useSearchAnime, flattenPages } from '../../src/api/anilist/hooks';
 import { currentSeason, type Media } from '../../src/api/anilist';
+import { useUnreadCount } from '../../src/features/notifications/store';
 import { radii, spacing, useTheme } from '../../src/theme';
 
 const H_PADDING = spacing.xl;
@@ -45,6 +46,7 @@ export default function DiscoverScreen() {
   const seasonal = useSeasonal();
   const search = useSearchAnime(query);
   const { season, year } = currentSeason();
+  const unreadCount = useUnreadCount();
 
   const columns = width >= 700 ? 4 : 3;
   const posterWidth = useMemo(
@@ -127,20 +129,43 @@ export default function DiscoverScreen() {
                   </Text>
                 </Text>
               </View>
-              <PressableScale
-                onPress={() => router.push('/settings')}
-                accessibilityRole="button"
-                accessibilityLabel="Settings"
-              >
-                <LinearGradient
-                  colors={gradients.brand}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.avatar}
+              <View style={styles.headerActions}>
+                <PressableScale
+                  onPress={() => router.push('/notifications')}
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'
+                  }
+                  style={[styles.bellBtn, { backgroundColor: colors.surfaceHigh }]}
                 >
-                  <Ionicons name="settings-sharp" size={20} color={colors.onMedia} />
-                </LinearGradient>
-              </PressableScale>
+                  <Ionicons
+                    name={unreadCount > 0 ? 'notifications' : 'notifications-outline'}
+                    size={20}
+                    color={colors.text}
+                  />
+                  {unreadCount > 0 && (
+                    <View style={[styles.badge, { backgroundColor: colors.danger }]}>
+                      <Text variant="caption" color={colors.onAccent} style={styles.badgeText}>
+                        {unreadCount > 9 ? '9+' : unreadCount}
+                      </Text>
+                    </View>
+                  )}
+                </PressableScale>
+                <PressableScale
+                  onPress={() => router.push('/settings')}
+                  accessibilityRole="button"
+                  accessibilityLabel="Settings"
+                >
+                  <LinearGradient
+                    colors={gradients.brand}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.avatar}
+                  >
+                    <Ionicons name="settings-sharp" size={20} color={colors.onMedia} />
+                  </LinearGradient>
+                </PressableScale>
+              </View>
             </Animated.View>
 
             <SearchBar value={query} onChangeText={setQuery} />
@@ -348,6 +373,33 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  bellBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    minWidth: 18,
+    height: 18,
+    paddingHorizontal: 3,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgeText: {
+    fontSize: 10,
+    lineHeight: 12,
   },
   trendingBlock: {
     gap: 0,

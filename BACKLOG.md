@@ -21,6 +21,7 @@ so any one can be picked up cold and started smoothly.
 | F22 | Per-screen signature treatments & motion | P3 | M | — (builds on shipped theme/token system) |
 | F26 | Network resilience — AniList 429/Retry-After + request timeout | P3 | S–M | — |
 | F27 | Web runtime robustness — ErrorBoundary, bounded cache persistence, sheet a11y | P3 | M | — |
+| F28 | Notification center — new-episode/new-season alerts (in-app feed; local push is a native stretch) | P2 | M–L | Detection runs on app open; true push needs a server (same limitation as F3/F8) |
 
 **Suggested build order** (fast value first, heavy infra last):
 `F3 → F7 → F8 → F18`, with the review items (F26/F27/F28) as independent
@@ -30,10 +31,17 @@ hardening whenever. Reorder freely — entries are independent except where
 ### Shared prerequisites (cross-cutting)
 - **Notifications infrastructure** (needed by F3): `expo-notifications` setup +
   a **development build** (push/scheduled notifications don't run in Expo Go on
-  current SDKs). One-time setup, then reusable.
+  current SDKs). One-time setup, then reusable. `expo-notifications` is already
+  an installed dependency and registered as an Expo config plugin
+  (`app.json`), but no code uses it yet — F3/F8/F28 are all still on the "in-app,
+  detected-on-open" side of this line.
 - **Push server** (for *true* app-closed alerts in F3/F8): F1 shipped as AniList
   OAuth (zero backend), so server-pushed notifications still need a small service
   polling AniList. Not built — without it, detection happens on app open.
+- **F28's detection loop** (batch-fetch tracked titles via `getAnimeById`, diff
+  against a locally stored snapshot, dedupe by id) is the general-purpose building
+  block F3/F8 can reuse for their own on-open checks — but F28 ships first as a
+  self-contained in-app notification center, independent of F3/F8.
 
 ---
 
@@ -158,6 +166,11 @@ the same detection plumbing and notification infra.
 - **UI:** a bell/"Super Follow" toggle in `app/anime/[id].tsx` (near the
   Add-to-list action), and a managed list (a section in Library or a dedicated
   screen) reusing `PosterCard`.
+- **Overlap with F28:** F28 ships a general "new-episode/new-season for my whole
+  list" feed first, with its own snapshot-diff detection loop. F8 is narrower
+  (explicit per-title follow, not gated on watch status) and can eventually
+  funnel its alerts into F28's same notification center/store rather than
+  inventing a second inbox — worth revisiting once both exist.
 
 ---
 
@@ -296,3 +309,108 @@ failures, and a couple of web-only UX gaps.
   to the persister so only small, high-value queries persist; wrap the persist
   restore so a quota error degrades to in-memory-only.
 - In `BottomSheet`, add a web-only `keydown` Escape listener while open.
+
+---
+
+## F28 — Notification center (new-episode/new-season alerts, in-app feed)
+
+**Goal:** Give the user one place — a bell icon + notification center — that
+surfaces "a new episode of X just aired" and "a new season of X was announced"
+for their tracked anime, detected when the app is opened (no backend push server
+exists, so this is honestly scoped as on-open detection, not true push).
+
+### The gap
+There is no notification system in the app today. F3 (Upcoming screen) and F8
+(Super Follow) each sketch their *own* narrow alerting UI for a slice of this
+problem (whole-list upcoming sequels; explicit per-title follows) but neither is
+built, and neither proposes a persistent, reviewable list of past alerts. F28 is
+the general-purpose piece: a single notification feed covering the two most
+valuable signals — new episodes and new seasons — for everything the user is
+already tracking, with read/unread state, that F3/F8 can point at later instead
+of building their own inboxes.
+
+### What "notification" means here (no backend)
+Every AniList read in this app happens on-demand (`src/api/anilist/`); there is
+no server, so nothing can be pushed to a closed app. F28's notifications are
+computed client-side by **diffing fresh AniList data against a locally stored
+snapshot of what was last seen**, run when the app is opened (and on manual
+pull-to-refresh in the notification center). This is the same honest limitation
+F3/F8 already document — see "Shared prerequisites" above.
+
+### Requirements / acceptance criteria
+- [ ] A bell icon (with an unread-count badge) is reachable from the app's main
+      screen and opens a dedicated notification center.
+- [ ] The notification center lists new-episode and new-season events for the
+      user's tracked titles, newest first, each showing the title, a poster
+      thumbnail, a human-readable message ("Episode 12 is out", "Season 2
+      announced"), and a relative timestamp.
+- [ ] Unread notifications are visually distinguished from read ones; opening a
+      notification (or a per-row action) marks it read; a "mark all read" action
+      exists; the bell badge count reflects unread notifications and clears
+      accordingly.
+- [ ] Tapping a notification navigates to the relevant anime's detail screen
+      (the source title for a new episode; the newly-announced sequel for a new
+      season).
+- [ ] An empty state ("You're all caught up") shows when there are no
+      notifications yet.
+- [ ] No duplicate notification is ever created for the same episode or the same
+      newly-announced season — running detection twice in a row produces no new
+      rows the second time.
+- [ ] Installing this feature on an existing list with history does **not**
+      flood the user with a notification per already-existing episode/season on
+      first run — only events detected *after* the feature starts tracking a
+      title generate a notification (first sight of a title silently baselines
+      it).
+- [ ] Detection runs automatically on app open and is rate-limit-conscious (not
+      a fresh unbounded AniList call per tracked title on every single foreground).
+- [ ] Works identically on web and native (this is a universal Expo Router app);
+      on native, a stretch (not required) is a local `expo-notifications` alert
+      fired alongside a new in-app notification — explicitly optional, gated
+      behind its own opt-in, and out of scope for the initial pass since it needs
+      the dev-build notifications infra noted in "Shared prerequisites."
+
+### Technical approach
+- **New feature module `src/features/notifications/`**, mirroring the
+  `src/features/tracking/` repository/store split:
+  - `types.ts` — `AppNotification` (id/type/mediaId/title/cover/message/
+    episode info/sequel info/createdAt/read) and `NotificationSnapshot`
+    (per-mediaId last-seen released-episode count + known SEQUEL relation ids +
+    an `initialized` bootstrap flag, so a title's *first* check seeds the
+    snapshot without emitting anything).
+  - `repository.ts` — an `AsyncStorageNotificationRepository` for the
+    notification list (`senpai:notifications:v1`), same read-modify-write +
+    serial-queue pattern as `AsyncStorageTrackingRepository`.
+  - A second small repository/keyspace for snapshots
+    (`senpai:notification-snapshots:v1`) — kept separate from the user-facing
+    notification list since its lifecycle (internal dedupe cache) is different.
+  - `store.ts` — a zustand `useNotificationStore` (entries, hydrated, hydrate,
+    add, markRead, markAllRead, unread count selector), following
+    `useTrackingStore`'s shape.
+  - `detect.ts` — `runNotificationDetection()`: for each tracked entry whose
+    status makes it eligible (episode checks: `CURRENT`/`REPEATING`/`PAUSED`;
+    season checks: `COMPLETED`), batch-fetch `getAnimeById` (already returns
+    `episodes`, `nextAiringEpisode`, and `relations` in one call — see
+    `src/api/anilist/index.ts`), diff against the stored snapshot, emit
+    `AppNotification`s for newly released episodes / newly appeared SEQUEL
+    relation nodes, and update the snapshot. Internally throttled (e.g. skip if
+    the last global run was under ~15 min ago, unless force-refreshed) and
+    capped in fan-out per run to respect AniList's ~90 req/min limit — same
+    concern F3/F7/F8 already call out.
+- **Wiring:** `app/_layout.tsx` hydrates the new store alongside the existing
+  `hydrateTracking`/`hydrateComfort`/etc. calls and fires
+  `runNotificationDetection()` once tracking is hydrated (mirrors the existing
+  `pullAndReconcile()` on-auth effect).
+- **UI:** a bell icon + unread badge added to the Discover header row in
+  `app/(tabs)/index.tsx` (next to the existing settings avatar button),
+  navigating to a new `app/notifications.tsx` screen registered in the root
+  `Stack` (`app/_layout.tsx`) with `slide_from_bottom`, matching
+  `settings`/`stats`/`comfort`. The screen follows `settings.tsx`'s
+  back-button-header pattern, a `FlatList` of rows (poster thumbnail via
+  `expo-image`, message, relative time via the already-installed `date-fns`,
+  unread dot), `EmptyState` for the empty case, and pull-to-refresh calling
+  `runNotificationDetection({ force: true })`.
+- **True push (app closed):** out of scope, same as F3/F8 — needs the
+  not-yet-built push server polling AniList. Local `expo-notifications` alerts
+  *while the app is foregrounded* are a documented native stretch only.
+
+---
