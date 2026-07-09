@@ -22,6 +22,7 @@ so any one can be picked up cold and started smoothly.
 | F26 | Network resilience — AniList 429/Retry-After + request timeout | P3 | S–M | — |
 | F27 | Web runtime robustness — ErrorBoundary, bounded cache persistence, sheet a11y | P3 | M | — |
 | F28 | Notification center — new-episode/new-season alerts (in-app feed; local push is a native stretch) | P2 | M–L | Detection runs on app open; true push needs a server (same limitation as F3/F8) |
+| F29 | Notification delivery layer — per-category settings, native local push via `expo-notifications`, status-change events | P3 | M | Extends shipped F28 (in-app feed + detection loop) |
 
 **Suggested build order** (fast value first, heavy infra last):
 `F3 → F7 → F8 → F18`, with the review items (F26/F27/F28) as independent
@@ -412,5 +413,68 @@ F3/F8 already document — see "Shared prerequisites" above.
 - **True push (app closed):** out of scope, same as F3/F8 — needs the
   not-yet-built push server polling AniList. Local `expo-notifications` alerts
   *while the app is foregrounded* are a documented native stretch only.
+
+---
+
+## F29 — Notification delivery layer (per-category settings, native local push, status-change events)
+
+**Goal:** Extend the shipped F28 notification center with a settings screen for
+per-category opt-in/out, native local push via `expo-notifications` on
+iOS/Android (as a foreground/dev-build stretch, not true app-closed delivery),
+and a broader event model that also covers status changes (e.g.
+`RELEASING → FINISHED`), not just new episodes and new seasons.
+
+### How this extends F28
+F28 shipped the detection loop, the persisted event log, and the web/universal
+in-app feed (bell icon + `/notifications` screen) — that's the foundation this
+item builds on, not a duplicate of it. F29 adds:
+1. A **settings screen** so users can opt in/out per event category, instead of
+   all detected events always landing in the feed.
+2. A **native delivery fork**: on iOS/Android, opted-in events *also* schedule a
+   local `expo-notifications` alert (foreground-triggered, dev build required —
+   see "Shared prerequisites" above) with a tap target that deep links to the
+   title. On web this is a no-op since the event is already in the feed.
+3. A **third event type**, `status_change`, alongside F28's `new-episode` and
+   `new-season` — e.g. a tracked title flipping `RELEASING → FINISHED`.
+
+### Requirements / acceptance criteria
+- [ ] A notification settings screen (or section within existing Settings) lets
+      the user opt in/out per category: new episode, new season, status change.
+      Opted-out categories are not written to the feed and don't schedule local
+      push.
+- [ ] **Mobile (iOS/Android):** opted-in events also schedule a local
+      notification via `expo-notifications` (dev build required — Expo Go
+      doesn't support this on current SDKs) with a tap target that deep links
+      to the relevant title's detail screen.
+- [ ] `status_change` detection: extend `runNotificationDetection` (F28's
+      `src/features/notifications/detect.ts`) to also diff a tracked title's
+      AniList `status` field against the stored snapshot and emit an event on
+      `RELEASING → FINISHED` (start with this one transition; others are a
+      follow-up).
+- [ ] Per-category preferences persist locally and are respected by both the
+      detection loop (whether to write an event at all) and the native delivery
+      fork (whether to also schedule a push).
+- [ ] Documented limitation carried over from F28: without a backend, all
+      detection still happens on app open/foreground — this applies to status
+      changes and native local push exactly as it does to F28's existing event
+      types.
+
+### Technical approach
+- **Reuse, don't fork, F28's model:** extend `AppNotification`'s `type` union
+  with `'status-change'` and extend `NotificationSnapshot` with whatever
+  status-tracking field the diff needs (e.g. `lastKnownStatus`) rather than
+  introducing a parallel event/repository system.
+- **Settings:** a small preferences object (e.g.
+  `{ newEpisode: boolean; newSeason: boolean; statusChange: boolean }`),
+  persisted via AsyncStorage (mirror F28's repository pattern), read by
+  `detect.ts` before writing an event and by the native delivery fork before
+  scheduling a push.
+- **Native delivery fork:** `Platform.OS !== 'web'` branch inside (or just
+  after) `store.add` — call `expo-notifications`' local scheduling API with a
+  deep link into `app/anime/[id].tsx`. Needs the dev-build / config-plugin setup
+  noted under "Shared prerequisites" above (already installed, not yet wired to
+  any code).
+- **True push (app closed):** still out of scope — needs the not-yet-built push
+  server polling AniList, same as F3/F8/F28.
 
 ---
