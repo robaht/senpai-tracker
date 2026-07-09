@@ -102,7 +102,7 @@ export function BottomSheet({ visible, onClose, children }: BottomSheetProps) {
 
 const useStyles = makeStyles(({ radii }) => ({
   backdrop: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(0,0,0,0.6)',
   },
   sheet: {

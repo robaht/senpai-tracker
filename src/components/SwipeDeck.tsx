@@ -253,7 +253,7 @@ const styles = StyleSheet.create({
     maxHeight: '78%',
   },
   cardSlot: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   card: {
     flex: 1,
