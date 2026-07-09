@@ -9,7 +9,9 @@
     "userInterfaceStyle": "automatic",
     "backgroundColor": "#0B0B12",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.roobaht.senpai",
+      "buildNumber": "1"
     },
     "android": {
       "adaptiveIcon": {
