@@ -43,6 +43,7 @@ export default function LibraryScreen() {
   const { colors } = useTheme();
   const styles = useStyles();
   const [filter, setFilter] = useState<Filter>('ALL');
+  const [genreSel, setGenreSel] = useState<string[]>([]);
   const [query, setQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortKey>('recent');
   const [sortOpen, setSortOpen] = useState(false);
@@ -56,19 +57,33 @@ export default function LibraryScreen() {
     return c;
   }, [all]);
 
+  // Genres actually present in the library (F30), with entry counts, most
+  // common first. Entries carry a denormalized `genres` snapshot, so this is
+  // purely local — no AniList fetch. `?? []` guards pre-genres persisted entries.
+  const genreCounts = useMemo(() => {
+    const c = new Map<string, number>();
+    for (const e of all) for (const g of e.genres ?? []) c.set(g, (c.get(g) ?? 0) + 1);
+    return [...c.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  }, [all]);
+
+  const toggleGenre = (g: string) =>
+    setGenreSel((sel) => (sel.includes(g) ? sel.filter((x) => x !== g) : [...sel, g]));
+
   const q = query.trim().toLowerCase();
   const searching = q.length > 0;
+  const genreFiltering = genreSel.length > 0;
 
-  // filter (status) → search (title) → sort. Counts above stay on the full
-  // list so the chip badges don't shift while searching.
+  // filter (status) → genres (any-match) → search (title) → sort. Counts above
+  // stay on the full list so the chip badges don't shift while searching.
   const filtered = useMemo(() => {
     const list = all.filter(
       (e) =>
         (filter === 'ALL' || e.status === filter) &&
+        (!genreFiltering || (e.genres ?? []).some((g) => genreSel.includes(g))) &&
         (!searching || e.title.toLowerCase().includes(q)),
     );
     return list.sort(SORT_COMPARATORS[sortBy]);
-  }, [all, filter, q, searching, sortBy]);
+  }, [all, filter, genreFiltering, genreSel, q, searching, sortBy]);
 
   // Only show status chips that actually have entries (keeps the bar tidy).
   const visibleStatuses = WATCH_STATUSES.filter((s) => counts[s] > 0);
@@ -76,7 +91,7 @@ export default function LibraryScreen() {
   const sortLabel = SORT_OPTIONS.find((o) => o.key === sortBy)!.label;
   // The "Continue watching" rail is a resume affordance, not a search result —
   // only surface it on the default unfiltered view.
-  const showRail = filter === 'ALL' && !searching && sortBy === 'recent';
+  const showRail = filter === 'ALL' && !searching && !genreFiltering && sortBy === 'recent';
 
   return (
     <Screen>
@@ -156,6 +171,37 @@ export default function LibraryScreen() {
         </ScrollView>
       )}
 
+      {all.length > 0 && genreCounts.length > 0 && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.chipsBar}
+          contentContainerStyle={[styles.chips, styles.genreChips]}
+        >
+          {genreFiltering && (
+            <Pressable
+              onPress={() => setGenreSel([])}
+              style={styles.clearChip}
+              hitSlop={6}
+              accessibilityRole="button"
+              accessibilityLabel="Clear genre filters"
+            >
+              <Ionicons name="close" size={14} color={colors.textMuted} />
+            </Pressable>
+          )}
+          {genreCounts.map(([g, n]) => (
+            <Chip
+              key={g}
+              label={g}
+              count={n}
+              active={genreSel.includes(g)}
+              color={colors.accentAlt}
+              onPress={() => toggleGenre(g)}
+            />
+          ))}
+        </ScrollView>
+      )}
+
       <FlatList
         data={filtered}
         keyExtractor={(item) => String(item.mediaId)}
@@ -171,6 +217,12 @@ export default function LibraryScreen() {
                 emoji="🔍"
                 title="No matches"
                 subtitle={`Nothing in your list matches “${query.trim()}”.`}
+              />
+            ) : genreFiltering ? (
+              <EmptyState
+                emoji="🏷️"
+                title="No matches"
+                subtitle={`Nothing ${filter === 'ALL' ? 'in your list' : 'with this status'} matches ${genreSel.join(' or ')}.`}
               />
             ) : (
               <EmptyState
@@ -287,6 +339,20 @@ const useStyles = makeStyles(({ colors, radii }) => ({
     paddingVertical: spacing.lg,
     gap: spacing.sm,
     alignItems: 'center',
+  },
+  // Genre row sits directly under the status row — drop the doubled-up gap.
+  genreChips: {
+    paddingTop: 0,
+  },
+  clearChip: {
+    width: 30,
+    height: 30,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceHigh,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   chip: {
     flexDirection: 'row',
