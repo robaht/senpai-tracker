@@ -28,6 +28,7 @@ import { PosterCard } from '../../src/components/PosterCard';
 import { EmptyState } from '../../src/components/EmptyState';
 import { useSeasonal, useTrending, useSearchAnime, flattenPages } from '../../src/api/anilist/hooks';
 import { currentSeason, type Media } from '../../src/api/anilist';
+import { useDebouncedValue } from '../../src/lib/useDebouncedValue';
 import { useUnreadCount } from '../../src/features/notifications/store';
 import { radii, spacing, useTheme } from '../../src/theme';
 
@@ -40,11 +41,15 @@ export default function DiscoverScreen() {
   const router = useRouter();
   const { colors, gradients, retro } = useTheme();
   const [query, setQuery] = useState('');
+  // Debounced so search-as-you-type doesn't fire one AniList request per
+  // keystroke (the search-mode UI still flips instantly off the raw query).
+  const debouncedQuery = useDebouncedValue(query);
   const isSearching = query.trim().length >= 2;
 
   const trending = useTrending();
   const seasonal = useSeasonal();
-  const search = useSearchAnime(query);
+  const search = useSearchAnime(debouncedQuery);
+  const searchPending = search.isFetching || query.trim() !== debouncedQuery.trim();
   const { season, year } = currentSeason();
   const unreadCount = useUnreadCount();
 
@@ -258,7 +263,7 @@ export default function DiscoverScreen() {
         )}
         ListEmptyComponent={
           isSearching ? (
-            search.isFetching ? (
+            searchPending ? (
               <ActivityIndicator color={colors.accent} style={styles.spinner} />
             ) : (
               <EmptyState

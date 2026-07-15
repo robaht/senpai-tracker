@@ -1,5 +1,5 @@
-import { anilistRequest } from './client';
-export { setAuthToken } from './client';
+import { anilistRequest, PATIENT } from './client';
+export { setAuthToken, isRateLimited } from './client';
 import {
   AIRING_SCHEDULE_QUERY,
   BROWSE_QUERY,
@@ -243,10 +243,11 @@ export async function getUserAnimeList(userName: string): Promise<ImportedListEn
  */
 export async function getMediaByMalIds(malIds: number[]): Promise<Media[]> {
   if (malIds.length === 0) return [];
-  const data = await anilistRequest<{ Page: { media: Media[] } }>(MEDIA_BY_MAL_IDS_QUERY, {
-    malIds,
-    perPage: malIds.length,
-  });
+  const data = await anilistRequest<{ Page: { media: Media[] } }>(
+    MEDIA_BY_MAL_IDS_QUERY,
+    { malIds, perPage: malIds.length },
+    PATIENT,
+  );
   return data.Page.media ?? [];
 }
 
@@ -291,7 +292,7 @@ interface RawMyListEntry {
 export async function getMyAnimeList(userId: number): Promise<MyListEntry[]> {
   const data = await anilistRequest<{
     MediaListCollection: { lists: { entries: RawMyListEntry[] }[] } | null;
-  }>(MY_LIST_QUERY, { userId });
+  }>(MY_LIST_QUERY, { userId }, PATIENT);
 
   const seen = new Set<number>();
   const out: MyListEntry[] = [];
@@ -323,6 +324,7 @@ export async function saveMediaListEntry(vars: {
   const data = await anilistRequest<{ SaveMediaListEntry: { id: number } | null }>(
     SAVE_MEDIA_LIST_ENTRY,
     vars,
+    PATIENT,
   );
   return data.SaveMediaListEntry?.id ?? null;
 }
@@ -332,6 +334,7 @@ export async function deleteMediaListEntry(id: number): Promise<void> {
   await anilistRequest<{ DeleteMediaListEntry: { deleted: boolean } | null }>(
     DELETE_MEDIA_LIST_ENTRY,
     { id },
+    PATIENT,
   );
 }
 

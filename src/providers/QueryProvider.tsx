@@ -3,6 +3,7 @@ import { QueryClient } from '@tanstack/react-query';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { isRateLimited } from '../api/anilist/client';
 
 /**
  * One QueryClient for the whole app. Defaults are tuned for AniList:
@@ -16,7 +17,9 @@ export const queryClient = new QueryClient({
     queries: {
       staleTime: 1000 * 60 * 5, // 5 min
       gcTime: 1000 * 60 * 60 * 24, // keep in cache 24h for persistence
-      retry: 2,
+      // 429s already exhausted the client's own retry/backoff loop — re-retrying
+      // here just re-enters it and turns a throttled screen into a minute-long hang.
+      retry: (failureCount, error) => !isRateLimited(error) && failureCount < 2,
       refetchOnWindowFocus: false,
     },
   },
