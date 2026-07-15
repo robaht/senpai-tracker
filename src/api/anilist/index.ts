@@ -3,6 +3,7 @@ export { setAuthToken, isRateLimited } from './client';
 import {
   AIRING_SCHEDULE_QUERY,
   BROWSE_QUERY,
+  DETECTION_MEDIA_QUERY,
   GENRES_QUERY,
   MEDIA_BY_ID_QUERY,
   MEDIA_BY_MAL_IDS_QUERY,
@@ -146,6 +147,29 @@ export async function getAnimeById(id: number): Promise<Media> {
     characters: characters?.edges ?? [],
     externalLinks: streaming,
   };
+}
+
+/**
+ * Batched read for the notification detection loop (F28): every candidate in
+ * one request instead of one `getAnimeById` per title — the per-title fan-out
+ * burned the whole ~30 req/min budget on app open and 429'd the screens the
+ * user was actually looking at. Patient profile since it's background work.
+ * Ids AniList doesn't return simply come back absent; the caller skips them.
+ */
+export async function getMediaForDetection(ids: number[]): Promise<Media[]> {
+  if (ids.length === 0) return [];
+  type RawDetectionMedia = Omit<Media, 'relations'> & {
+    relations?: { edges: MediaRelationEdge[] };
+  };
+  const data = await anilistRequest<{ Page: { media: RawDetectionMedia[] } }>(
+    DETECTION_MEDIA_QUERY,
+    { ids, perPage: Math.min(ids.length, 50) },
+    PATIENT,
+  );
+  return (data.Page.media ?? []).map(({ relations, ...media }) => ({
+    ...media,
+    relations: relations?.edges ?? [],
+  }));
 }
 
 export async function getAiringSchedule(

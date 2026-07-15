@@ -1,19 +1,22 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getAnimeById } from '../src/api/anilist';
+import { getMediaForDetection } from '../src/api/anilist';
 import { runNotificationDetection } from '../src/features/notifications/detect';
 import { snapshotRepository } from '../src/features/notifications/snapshotRepository';
 import { useNotificationStore } from '../src/features/notifications/store';
 import { useTrackingStore } from '../src/features/tracking/store';
 import { media, relationEdge, trackEntry } from './_fixtures';
 
-// Only `getAnimeById` needs to be a mock/spy — keep everything else (e.g.
-// `displayTitle`) real, since `detect.ts` relies on it to resolve titles.
+// Only `getMediaForDetection` needs to be a mock/spy — keep everything else
+// (e.g. `displayTitle`) real, since `detect.ts` relies on it to resolve titles.
 jest.mock('../src/api/anilist', () => {
   const actual = jest.requireActual('../src/api/anilist');
-  return { ...actual, getAnimeById: jest.fn() };
+  return { ...actual, getMediaForDetection: jest.fn() };
 });
 
-const mockGetAnimeById = getAnimeById as jest.MockedFunction<typeof getAnimeById>;
+const mockGetMedia = getMediaForDetection as jest.MockedFunction<typeof getMediaForDetection>;
+
+/** Default happy-path mock: echo every requested id back as a bare media. */
+const echoIds = () => mockGetMedia.mockImplementation(async (ids: number[]) => ids.map((id) => media(id)));
 
 const airing = (episode: number) => ({ airingAt: 0, timeUntilAiring: 0, episode });
 
@@ -21,7 +24,7 @@ async function reset() {
   await AsyncStorage.clear();
   useNotificationStore.setState({ entries: {}, hydrated: true });
   useTrackingStore.setState({ entries: {}, hydrated: true });
-  mockGetAnimeById.mockReset();
+  mockGetMedia.mockReset();
 }
 
 beforeEach(reset);
@@ -32,7 +35,7 @@ describe('runNotificationDetection — first-run baselining (AC 6, 7)', () => {
       entries: { 1: trackEntry(1, { mediaId: 1, status: 'CURRENT' }) },
       hydrated: true,
     });
-    mockGetAnimeById.mockResolvedValue(media(1, { episodes: null, nextAiringEpisode: airing(6) })); // releasedEpisodes = 5
+    mockGetMedia.mockResolvedValue([media(1, { episodes: null, nextAiringEpisode: airing(6) })]); // releasedEpisodes = 5
 
     const result = await runNotificationDetection({ force: true });
 
@@ -47,11 +50,11 @@ describe('runNotificationDetection — first-run baselining (AC 6, 7)', () => {
       entries: { 1: trackEntry(1, { mediaId: 1, status: 'CURRENT' }) },
       hydrated: true,
     });
-    mockGetAnimeById.mockResolvedValue(media(1, { episodes: null, nextAiringEpisode: airing(6) })); // released 5
+    mockGetMedia.mockResolvedValue([media(1, { episodes: null, nextAiringEpisode: airing(6) })]); // released 5
     const first = await runNotificationDetection({ force: true });
     expect(first.added).toBe(0);
 
-    mockGetAnimeById.mockResolvedValue(media(1, { episodes: null, nextAiringEpisode: airing(8) })); // released 7
+    mockGetMedia.mockResolvedValue([media(1, { episodes: null, nextAiringEpisode: airing(8) })]); // released 7
     const second = await runNotificationDetection({ force: true });
 
     expect(second.added).toBe(1);
@@ -64,12 +67,12 @@ describe('runNotificationDetection — first-run baselining (AC 6, 7)', () => {
       entries: { 1: trackEntry(1, { mediaId: 1, status: 'COMPLETED' }) },
       hydrated: true,
     });
-    mockGetAnimeById.mockResolvedValue(
+    mockGetMedia.mockResolvedValue([
       media(1, {
         episodes: 12,
         relations: [relationEdge('SEQUEL', { id: 99, title: { romaji: 'Season 2', english: null, native: null } })],
       }),
-    );
+    ]);
 
     const result = await runNotificationDetection({ force: true });
 
@@ -87,7 +90,7 @@ describe('runNotificationDetection — dedupe / idempotent re-run (AC 6)', () =>
       hydrated: true,
     });
     await snapshotRepository.upsert({ mediaId: 1, releasedEpisodes: 5, knownSequelIds: [], initialized: true, lastCheckedAt: 1 });
-    mockGetAnimeById.mockResolvedValue(media(1, { episodes: null, nextAiringEpisode: airing(8) })); // released 7
+    mockGetMedia.mockResolvedValue([media(1, { episodes: null, nextAiringEpisode: airing(8) })]); // released 7
 
     const first = await runNotificationDetection({ force: true });
     expect(first.added).toBe(1);
@@ -120,20 +123,20 @@ describe('runNotificationDetection — dedupe / idempotent re-run (AC 6)', () =>
 });
 
 describe('runNotificationDetection — 15-minute throttle (AC 12)', () => {
-  it('a second non-forced call within the window makes no further getAnimeById calls', async () => {
+  it('a second non-forced call within the window makes no further network calls', async () => {
     useTrackingStore.setState({
       entries: { 1: trackEntry(1, { mediaId: 1, status: 'CURRENT' }) },
       hydrated: true,
     });
-    mockGetAnimeById.mockResolvedValue(media(1));
+    echoIds();
 
     const first = await runNotificationDetection();
-    expect(mockGetAnimeById).toHaveBeenCalledTimes(1);
+    expect(mockGetMedia).toHaveBeenCalledTimes(1);
     expect(first.added).toBe(0); // first-ever check baselines silently anyway
 
     const second = await runNotificationDetection();
     expect(second).toEqual({ added: 0 });
-    expect(mockGetAnimeById).toHaveBeenCalledTimes(1); // no additional network call
+    expect(mockGetMedia).toHaveBeenCalledTimes(1); // no additional network call
   });
 
   it('force bypasses the throttle', async () => {
@@ -141,13 +144,13 @@ describe('runNotificationDetection — 15-minute throttle (AC 12)', () => {
       entries: { 1: trackEntry(1, { mediaId: 1, status: 'CURRENT' }) },
       hydrated: true,
     });
-    mockGetAnimeById.mockResolvedValue(media(1));
+    echoIds();
 
     await runNotificationDetection();
-    expect(mockGetAnimeById).toHaveBeenCalledTimes(1);
+    expect(mockGetMedia).toHaveBeenCalledTimes(1);
 
     await runNotificationDetection({ force: true });
-    expect(mockGetAnimeById).toHaveBeenCalledTimes(2);
+    expect(mockGetMedia).toHaveBeenCalledTimes(2);
   });
 });
 
@@ -158,7 +161,7 @@ describe('runNotificationDetection — new-episode detection math', () => {
       hydrated: true,
     });
     await snapshotRepository.upsert({ mediaId: 1, releasedEpisodes: 3, knownSequelIds: [], initialized: true, lastCheckedAt: 1 });
-    mockGetAnimeById.mockResolvedValue(media(1, { episodes: null, nextAiringEpisode: airing(5) })); // released = 4
+    mockGetMedia.mockResolvedValue([media(1, { episodes: null, nextAiringEpisode: airing(5) })]); // released = 4
 
     const result = await runNotificationDetection({ force: true });
 
@@ -173,7 +176,7 @@ describe('runNotificationDetection — new-episode detection math', () => {
       hydrated: true,
     });
     await snapshotRepository.upsert({ mediaId: 1, releasedEpisodes: 10, knownSequelIds: [], initialized: true, lastCheckedAt: 1 });
-    mockGetAnimeById.mockResolvedValue(media(1, { episodes: 12, nextAiringEpisode: null }));
+    mockGetMedia.mockResolvedValue([media(1, { episodes: 12, nextAiringEpisode: null })]);
 
     const result = await runNotificationDetection({ force: true });
 
@@ -188,7 +191,7 @@ describe('runNotificationDetection — new-episode detection math', () => {
       hydrated: true,
     });
     await snapshotRepository.upsert({ mediaId: 1, releasedEpisodes: 0, knownSequelIds: [], initialized: true, lastCheckedAt: 1 });
-    mockGetAnimeById.mockResolvedValue(media(1, { episodes: null, nextAiringEpisode: null }));
+    mockGetMedia.mockResolvedValue([media(1, { episodes: null, nextAiringEpisode: null })]);
 
     const result = await runNotificationDetection({ force: true });
     expect(result.added).toBe(0); // 0 > 0 is false, no notification
@@ -200,7 +203,7 @@ describe('runNotificationDetection — new-episode detection math', () => {
       hydrated: true,
     });
     await snapshotRepository.upsert({ mediaId: 1, releasedEpisodes: 10, knownSequelIds: [], initialized: true, lastCheckedAt: 1 });
-    mockGetAnimeById.mockResolvedValue(media(1, { episodes: 12, nextAiringEpisode: null }));
+    mockGetMedia.mockResolvedValue([media(1, { episodes: 12, nextAiringEpisode: null })]);
 
     const result = await runNotificationDetection({ force: true });
     expect(result.added).toBe(0);
@@ -214,12 +217,12 @@ describe('runNotificationDetection — new-season detection', () => {
       hydrated: true,
     });
     await snapshotRepository.upsert({ mediaId: 1, releasedEpisodes: 12, knownSequelIds: [], initialized: true, lastCheckedAt: 1 });
-    mockGetAnimeById.mockResolvedValue(
+    mockGetMedia.mockResolvedValue([
       media(1, {
         episodes: 12,
         relations: [relationEdge('SEQUEL', { id: 99, title: { romaji: 'Season 2', english: null, native: null } })],
       }),
-    );
+    ]);
 
     const result = await runNotificationDetection({ force: true });
 
@@ -240,12 +243,12 @@ describe('runNotificationDetection — new-season detection', () => {
       hydrated: true,
     });
     await snapshotRepository.upsert({ mediaId: 1, releasedEpisodes: 12, knownSequelIds: [99], initialized: true, lastCheckedAt: 1 });
-    mockGetAnimeById.mockResolvedValue(
+    mockGetMedia.mockResolvedValue([
       media(1, {
         episodes: 12,
         relations: [relationEdge('SEQUEL', { id: 99, title: { romaji: 'Season 2', english: null, native: null } })],
       }),
-    );
+    ]);
 
     const result = await runNotificationDetection({ force: true });
     expect(result.added).toBe(0);
@@ -257,12 +260,12 @@ describe('runNotificationDetection — new-season detection', () => {
       hydrated: true,
     });
     await snapshotRepository.upsert({ mediaId: 1, releasedEpisodes: 12, knownSequelIds: [], initialized: true, lastCheckedAt: 1 });
-    mockGetAnimeById.mockResolvedValue(
+    mockGetMedia.mockResolvedValue([
       media(1, {
         episodes: 12,
         relations: [relationEdge('PREQUEL', { id: 50, title: { romaji: 'Season 0', english: null, native: null } })],
       }),
-    );
+    ]);
 
     const result = await runNotificationDetection({ force: true });
     expect(result.added).toBe(0);
@@ -276,13 +279,13 @@ describe('runNotificationDetection — new-season detection', () => {
       hydrated: true,
     });
     await snapshotRepository.upsert({ mediaId: 1, releasedEpisodes: 12, knownSequelIds: [], initialized: true, lastCheckedAt: 1 });
-    mockGetAnimeById.mockResolvedValue(
+    mockGetMedia.mockResolvedValue([
       media(1, {
         episodes: 12,
         nextAiringEpisode: null,
         relations: [relationEdge('SEQUEL', { id: 99, title: { romaji: 'Season 2', english: null, native: null } })],
       }),
-    );
+    ]);
 
     const result = await runNotificationDetection({ force: true });
     expect(result.added).toBe(0);
@@ -306,12 +309,13 @@ describe('runNotificationDetection — candidate id split by tracking status', (
       },
       hydrated: true,
     });
-    mockGetAnimeById.mockImplementation(async (id: number) => media(id));
+    echoIds();
 
     await runNotificationDetection({ force: true });
 
-    const calledIds = mockGetAnimeById.mock.calls.map((c) => c[0]).sort((a, b) => a - b);
-    expect(calledIds).toEqual([1, 4, 5, 6]);
+    expect(mockGetMedia).toHaveBeenCalledTimes(1); // the whole run is one batched request
+    const requestedIds = [...mockGetMedia.mock.calls[0][0]].sort((a, b) => a - b);
+    expect(requestedIds).toEqual([1, 4, 5, 6]);
   });
 });
 
@@ -332,18 +336,38 @@ describe('runNotificationDetection — 40-id fan-out cap, oldest-checked-first',
         lastCheckedAt: Date.now(),
       });
     }
-    mockGetAnimeById.mockImplementation(async (id: number) => media(id));
+    echoIds();
 
     await runNotificationDetection({ force: true });
 
-    const calledIds = mockGetAnimeById.mock.calls.map((c) => c[0]).sort((a, b) => a - b);
-    expect(calledIds).toHaveLength(40);
-    expect(calledIds).toEqual(Array.from({ length: 40 }, (_, i) => i + 6));
+    const requestedIds = [...mockGetMedia.mock.calls[0][0]].sort((a, b) => a - b);
+    expect(requestedIds).toHaveLength(40);
+    expect(requestedIds).toEqual(Array.from({ length: 40 }, (_, i) => i + 6));
   });
 });
 
-describe('runNotificationDetection — per-id fetch failures', () => {
-  it('skips a failing id and still processes the rest of the batch', async () => {
+describe('runNotificationDetection — fetch failures and partial responses', () => {
+  it('a failed batch fetch skips the run without stamping the throttle, so the next run retries', async () => {
+    useTrackingStore.setState({
+      entries: { 1: trackEntry(1, { mediaId: 1, status: 'CURRENT' }) },
+      hydrated: true,
+    });
+    await snapshotRepository.upsert({ mediaId: 1, releasedEpisodes: 1, knownSequelIds: [], initialized: true, lastCheckedAt: 1 });
+    mockGetMedia.mockRejectedValueOnce(new Error('network error'));
+
+    const failed = await runNotificationDetection(); // non-forced: would stamp the throttle on success
+    expect(failed.added).toBe(0);
+    // Snapshot untouched by the failed run.
+    expect(await snapshotRepository.get(1)).toMatchObject({ releasedEpisodes: 1 });
+
+    // Next non-forced run is NOT throttled out — it fetches again.
+    mockGetMedia.mockResolvedValue([media(1, { episodes: null, nextAiringEpisode: airing(4) })]); // released 3
+    const retried = await runNotificationDetection();
+    expect(mockGetMedia).toHaveBeenCalledTimes(2);
+    expect(retried.added).toBe(1);
+  });
+
+  it('ids missing from the batch response are skipped; the rest still process', async () => {
     useTrackingStore.setState({
       entries: {
         1: trackEntry(1, { mediaId: 1, status: 'CURRENT' }),
@@ -354,17 +378,15 @@ describe('runNotificationDetection — per-id fetch failures', () => {
     await snapshotRepository.upsert({ mediaId: 1, releasedEpisodes: 1, knownSequelIds: [], initialized: true, lastCheckedAt: 1 });
     await snapshotRepository.upsert({ mediaId: 2, releasedEpisodes: 1, knownSequelIds: [], initialized: true, lastCheckedAt: 1 });
 
-    mockGetAnimeById.mockImplementation(async (id: number) => {
-      if (id === 1) throw new Error('network error');
-      return media(2, { episodes: null, nextAiringEpisode: airing(4) }); // released 3
-    });
+    // AniList doesn't return id 1 (deleted/unknown title) — only id 2 comes back.
+    mockGetMedia.mockResolvedValue([media(2, { episodes: null, nextAiringEpisode: airing(4) })]); // released 3
 
     const result = await runNotificationDetection({ force: true });
 
     expect(result.added).toBe(1);
     const entries = Object.values(useNotificationStore.getState().entries);
     expect(entries).toMatchObject([{ mediaId: 2 }]);
-    // The failing id's snapshot must be untouched (no baseline write on error).
+    // The absent id's snapshot must be untouched (no baseline write).
     const snap1 = await snapshotRepository.get(1);
     expect(snap1).toMatchObject({ releasedEpisodes: 1 });
   });

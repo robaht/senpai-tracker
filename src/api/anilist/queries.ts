@@ -311,6 +311,30 @@ export const MEDIA_BY_MAL_IDS_QUERY = gql`
 `;
 
 /**
+ * Batched read for the notification detection loop (F28): all candidate titles
+ * in one request, including the SEQUEL relations the new-season diff needs.
+ * Capped at AniList's 50-per-page max — detection's fan-out cap is below that.
+ */
+export const DETECTION_MEDIA_QUERY = gql`
+  ${MEDIA_FIELDS}
+  query DetectionMedia($ids: [Int], $perPage: Int = 50) {
+    Page(page: 1, perPage: $perPage) {
+      media(id_in: $ids, type: ANIME) {
+        ...MediaFields
+        relations {
+          edges {
+            relationType
+            node {
+              ...MediaFields
+            }
+          }
+        }
+      }
+    }
+  }
+`;
+
+/**
  * Airing schedule within a unix-time window — powers the weekly schedule.
  * We sort ascending so the soonest episode is first.
  */

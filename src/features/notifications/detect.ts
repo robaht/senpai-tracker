@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { displayTitle, getAnimeById, type Media } from '../../api/anilist';
+import { displayTitle, getMediaForDetection, type Media } from '../../api/anilist';
 import { useTrackingStore } from '../tracking/store';
 import { snapshotRepository } from './snapshotRepository';
 import { useNotificationStore } from './store';
@@ -7,10 +7,8 @@ import type { AppNotification, NotificationSnapshot } from './types';
 
 /** Don't hammer AniList on every foreground/HMR reload during dev. */
 const THROTTLE_MS = 15 * 60 * 1000;
-/** Worst-case AniList calls per run, well under the ~90 req/min budget (F7/F8). */
+/** Candidates per run — must stay ≤ 50 so the batched read fits one AniList page. */
 const MAX_FAN_OUT = 40;
-/** Small concurrent batches so one slow/failing id doesn't block the rest. */
-const FETCH_CHUNK_SIZE = 5;
 
 const META_KEY = 'senpai:notification-meta:v1';
 
@@ -59,12 +57,6 @@ function sequelIdsOf(media: Media): number[] {
   return (media.relations ?? [])
     .filter((e) => e.relationType === 'SEQUEL')
     .map((e) => e.node.id);
-}
-
-function chunk<T>(items: T[], size: number): T[][] {
-  const out: T[][] = [];
-  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
-  return out;
 }
 
 /** Adds `n` via the store and reports whether it was actually new (store dedupes by id). */
@@ -146,15 +138,15 @@ async function diffAndNotify(
 }
 
 /**
- * Diff-based, on-open notification detection: fetches a fresh AniList read
- * for each tracked candidate title and compares it against the last-seen
- * snapshot, emitting `new-episode`/`new-season` notifications on the way.
+ * Diff-based, on-open notification detection: one batched AniList read for
+ * all candidate titles, compared against their last-seen snapshots, emitting
+ * `new-episode`/`new-season` notifications on the way. Must stay a single
+ * request — a per-title fan-out here once ate AniList's whole ~30 req/min
+ * budget on app open and starved the visible screens into 429 errors.
  *
- * `getAnimeById` also fetches characters/externalLinks, which this doesn't
- * need — acceptable for this pass; a leaner query is a future optimization,
- * not built here. A future stretch could also layer `expo-notifications`
- * local scheduling on top of this loop for a dev build, but that needs a dev
- * build (not Expo Go) and is explicitly out of scope for now.
+ * A future stretch could layer `expo-notifications` local scheduling on top
+ * of this loop for a dev build, but that needs a dev build (not Expo Go) and
+ * is explicitly out of scope for now.
  */
 export async function runNotificationDetection(opts?: { force?: boolean }): Promise<{ added: number }> {
   const now = Date.now();
@@ -186,21 +178,25 @@ export async function runNotificationDetection(opts?: { force?: boolean }): Prom
   withSnapshots.sort((a, b) => (a.snapshot?.lastCheckedAt ?? 0) - (b.snapshot?.lastCheckedAt ?? 0));
   const selected = withSnapshots.slice(0, MAX_FAN_OUT);
 
+  let medias: Media[];
+  try {
+    medias = await getMediaForDetection(selected.map((s) => s.id));
+  } catch {
+    // Offline or throttled: skip without stamping the check time, so the next
+    // app open retries instead of going silent for the whole throttle window.
+    return { added: 0 };
+  }
+
+  const snapshotById = new Map(selected.map((s) => [s.id, s.snapshot]));
   let added = 0;
-  for (const batch of chunk(selected, FETCH_CHUNK_SIZE)) {
-    const results = await Promise.allSettled(batch.map((s) => getAnimeById(s.id)));
-    for (let i = 0; i < results.length; i++) {
-      const result = results[i];
-      if (result.status !== 'fulfilled') continue; // swallow per-id errors, skip this run
-      const media = result.value;
-      const prior = batch[i].snapshot ?? emptySnapshot(media.id);
-      added += await diffAndNotify(
-        media,
-        prior,
-        episodeCandidates.has(media.id),
-        seasonCandidates.has(media.id),
-      );
-    }
+  for (const media of medias) {
+    const prior = snapshotById.get(media.id) ?? emptySnapshot(media.id);
+    added += await diffAndNotify(
+      media,
+      prior,
+      episodeCandidates.has(media.id),
+      seasonCandidates.has(media.id),
+    );
   }
 
   await setLastGlobalCheckAt(now);

@@ -56,7 +56,7 @@ export default function AnimeDetailScreen() {
   const { colors, isDark } = useTheme();
   const styles = useStyles();
 
-  const { data: media, isLoading, isError } = useAnime(mediaId);
+  const { data: media, isLoading, isError, refetch } = useAnime(mediaId);
   const entry = useTrackEntry(mediaId);
   const isComfort = useIsComfort(mediaId);
   const toggleComfort = useComfortStore((s) => s.toggle);
@@ -147,7 +147,13 @@ export default function AnimeDetailScreen() {
         {isLoading ? (
           <DetailSkeleton />
         ) : isError || !media ? (
-          <EmptyState emoji="😵" title="Couldn't load this title" subtitle="Please try again later." />
+          <EmptyState
+            emoji="😵"
+            title="Couldn't load this title"
+            subtitle="AniList may be busy — give it a moment."
+            actionLabel="Try again"
+            onAction={() => refetch()}
+          />
         ) : (
           <View style={styles.content}>
             {/* Cinematic title block — sits in the banner's fade-out. Uses theme
