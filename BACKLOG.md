@@ -23,6 +23,7 @@ so any one can be picked up cold and started smoothly.
 | F27 | Web runtime robustness — ErrorBoundary, bounded cache persistence, sheet a11y | P3 | M | — |
 | F28 | Notification center — new-episode/new-season alerts (in-app feed; local push is a native stretch) | P2 | M–L | Detection runs on app open; true push needs a server (same limitation as F3/F8) |
 | F29 | Notification delivery layer — per-category settings, native local push via `expo-notifications`, status-change events | P3 | M | Extends shipped F28 (in-app feed + detection loop) |
+| F30 | Filter Library by genre | P2 | S | — (extends shipped Library filters + genre browse) |
 
 **Suggested build order** (fast value first, heavy infra last):
 `F3 → F7 → F8 → F18`, with the review items (F26/F27/F28) as independent
@@ -476,5 +477,47 @@ item builds on, not a duplicate of it. F29 adds:
   any code).
 - **True push (app closed):** still out of scope — needs the not-yet-built push
   server polling AniList, same as F3/F8/F28.
+
+---
+
+## F30 — Filter Library by genre
+
+**Goal:** Let the user narrow their Library list down to one or more genres,
+alongside the existing status filter and search.
+
+### Requirements / acceptance criteria
+- [ ] A genre filter (multi-select chip row, matching the pattern already used
+      for genre browse) is reachable from the Library screen.
+- [ ] Selecting one or more genres narrows the visible list to entries that have
+      at least one matching genre; selecting none shows the full (status/search-
+      filtered) list as today.
+- [ ] Genre filter composes with the existing status filter and search — all
+      three narrow the same list together, not as separate exclusive modes.
+- [ ] Only genres actually present in the user's tracked entries are offered (no
+      point listing "Mecha" as a filter option if nothing tracked has it).
+- [ ] Selection state is visually clear (active chip styling, consistent with
+      `app/browse.tsx`'s genre chips) and easy to clear (tap again to
+      deselect, or a reset action).
+- [ ] Empty state when a genre selection matches nothing.
+
+### Technical approach
+- `TrackEntry` already carries a denormalized `genres: string[]` snapshot field
+  (`src/features/tracking/types.ts:39`), so this is a **local filter — no AniList
+  fetch needed**, unlike the genre browse feature (`app/browse.tsx`) which queries
+  `useGenres()` server-side.
+- Derive the offered genre list from `Object.values(entries).flatMap(e =>
+  e.genres)`, deduped, in `app/(tabs)/library.tsx` — same file that already holds
+  the `filtered` memo (lines 64-71) chaining status → search → sort. Add a genre
+  step to that pipeline (`entry.genres.some(g => selectedGenres.includes(g))`).
+- Reuse the existing local `Chip` component in `library.tsx` (lines 200-233,
+  currently used for status) for genre chips too, rather than introducing a new
+  component — the visual pattern is already established there and in
+  `browse.tsx`'s inline pill chips (`styles.chip`, lines 244-249,
+  `withAlpha(colors.accent, 0.16)` active state from `src/components/ui/Badge.tsx`).
+- Since there's no shared chip-row component yet (each screen defines its own),
+  keep this a local addition to `library.tsx`'s filter bar rather than a new
+  abstraction — worth revisiting if a third screen needs the same pattern.
+- State: a local `genres: string[]` selection array, same shape as `browse.tsx`'s
+  `toggleGenre` pattern (lines 51-52).
 
 ---
