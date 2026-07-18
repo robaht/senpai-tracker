@@ -1,6 +1,10 @@
-import { isAiringRefreshCandidate } from '../src/features/tracking/airingRefresh';
+import { isAiringRefreshCandidate, runAiringRefresh } from '../src/features/tracking/airingRefresh';
 import { airedEpisodesFromMedia, useTrackingStore } from '../src/features/tracking/store';
+import { getMediaForDetection } from '../src/api/anilist';
 import { media, trackEntry } from './_fixtures';
+
+jest.mock('../src/api/anilist', () => ({ getMediaForDetection: jest.fn() }));
+const mockedGetMedia = getMediaForDetection as jest.MockedFunction<typeof getMediaForDetection>;
 
 const reset = () => useTrackingStore.setState({ entries: {}, hydrated: true });
 
@@ -31,6 +35,47 @@ describe('isAiringRefreshCandidate', () => {
   it('excludes terminal statuses', () => {
     expect(isAiringRefreshCandidate(trackEntry(1, { airingStatus: 'FINISHED' }))).toBe(false);
     expect(isAiringRefreshCandidate(trackEntry(1, { airingStatus: 'CANCELLED' }))).toBe(false);
+  });
+});
+
+describe('runAiringRefresh', () => {
+  beforeEach(() => {
+    reset();
+    mockedGetMedia.mockReset();
+    jest.useFakeTimers();
+  });
+  afterEach(() => jest.useRealTimers());
+
+  it('backfills a >50-entry library across multiple paced pages in one run', async () => {
+    const entries: Record<number, ReturnType<typeof trackEntry>> = {};
+    for (let id = 1; id <= 120; id++) entries[id] = trackEntry(id); // pre-feature: no airingStatus
+    useTrackingStore.setState({ entries });
+    mockedGetMedia.mockImplementation(async (ids) => ids.map((id) => media(id, { status: 'FINISHED' })));
+
+    const run = runAiringRefresh({ force: true });
+    await jest.runAllTimersAsync();
+    const { refreshed } = await run;
+
+    expect(refreshed).toBe(120);
+    expect(mockedGetMedia).toHaveBeenCalledTimes(3); // 50 + 50 + 20
+    expect(mockedGetMedia.mock.calls[2][0]).toHaveLength(20);
+    expect(useTrackingStore.getState().entries[120]!.airingStatus).toBe('FINISHED');
+  });
+
+  it('keeps pages already applied when a later page fails', async () => {
+    const entries: Record<number, ReturnType<typeof trackEntry>> = {};
+    for (let id = 1; id <= 60; id++) entries[id] = trackEntry(id);
+    useTrackingStore.setState({ entries });
+    mockedGetMedia
+      .mockImplementationOnce(async (ids) => ids.map((id) => media(id, { status: 'RELEASING' })))
+      .mockRejectedValueOnce(new Error('429'));
+
+    const run = runAiringRefresh({ force: true });
+    await jest.runAllTimersAsync();
+    const { refreshed } = await run;
+
+    expect(refreshed).toBe(50);
+    expect(useTrackingStore.getState().entries[1]!.airingStatus).toBe('RELEASING');
   });
 });
 

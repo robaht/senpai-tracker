@@ -5,8 +5,18 @@ import type { TrackEntry } from './types';
 
 /** Same cadence as notification detection — don't hammer AniList on reloads. */
 const THROTTLE_MS = 15 * 60 * 1000;
-/** One batched request — must stay ≤ 50 so it fits a single AniList page. */
-const MAX_FAN_OUT = 50;
+/** AniList page cap — one batched request covers up to 50 titles. */
+const PAGE_SIZE = 50;
+/**
+ * Upper bound on requests per run (600 titles). The first run after the badge
+ * feature ships must backfill the *whole* library — every pre-feature entry is a
+ * candidate — and at 1×50 per 15 min a large library stayed visibly badge-less
+ * for hours. Requests are paced ~2.5s apart to respect the ~30 req/min budget.
+ */
+const MAX_PAGES_PER_RUN = 12;
+const PAGE_INTERVAL_MS = 2500;
+
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 const META_KEY = 'senpai:airing-refresh:v1';
 
@@ -57,22 +67,30 @@ export async function runAiringRefresh(opts?: { force?: boolean }): Promise<{ re
   const candidates = entries
     .filter(isAiringRefreshCandidate)
     .sort((a, b) => Number(a.airingStatus != null) - Number(b.airingStatus != null))
-    .slice(0, MAX_FAN_OUT);
+    .slice(0, PAGE_SIZE * MAX_PAGES_PER_RUN);
 
   if (candidates.length === 0) {
     await setLastRefreshAt(now);
     return { refreshed: 0 };
   }
 
-  let medias;
-  try {
-    medias = await getMediaForDetection(candidates.map((c) => c.mediaId));
-  } catch {
-    // Offline or throttled: don't stamp the run, so the next app open retries.
-    return { refreshed: 0 };
+  let refreshed = 0;
+  for (let i = 0; i < candidates.length; i += PAGE_SIZE) {
+    if (i > 0) await sleep(PAGE_INTERVAL_MS);
+    const page = candidates.slice(i, i + PAGE_SIZE);
+    let medias;
+    try {
+      medias = await getMediaForDetection(page.map((c) => c.mediaId));
+    } catch {
+      // Offline or throttled. Keep whatever pages already applied; only stamp
+      // the run if at least one page landed, so a dead-network open retries.
+      if (refreshed > 0) await setLastRefreshAt(now);
+      return { refreshed };
+    }
+    useTrackingStore.getState().applyAiringRefresh(medias);
+    refreshed += medias.length;
   }
 
-  useTrackingStore.getState().applyAiringRefresh(medias);
   await setLastRefreshAt(now);
-  return { refreshed: medias.length };
+  return { refreshed };
 }
