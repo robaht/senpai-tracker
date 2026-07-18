@@ -2,7 +2,8 @@ import { View, Pressable, StyleSheet, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useGoBack } from '../src/lib/useGoBack';
 import { Ionicons } from '@expo/vector-icons';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import Animated from 'react-native-reanimated';
+import { cardEntering } from '../src/lib/motion';
 import { Screen } from '../src/components/ui/Screen';
 import { Text } from '../src/components/ui/Text';
 import { Skeleton } from '../src/components/ui/Skeleton';
@@ -86,7 +87,7 @@ export default function ForYouScreen() {
         showsVerticalScrollIndicator={false}
         ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
         renderItem={({ item }: { item: ForYouItem }) => (
-          <Animated.View entering={FadeIn.duration(250)}>
+          <Animated.View entering={cardEntering}>
             <MatchCard item={item} onDismiss={() => dismiss(item.media.id)} />
           </Animated.View>
         )}

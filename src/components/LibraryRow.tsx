@@ -7,8 +7,8 @@ import { Text } from './ui/Text';
 import { Badge, withAlpha } from './ui/Badge';
 import { PressableScale } from './ui/PressableScale';
 import { STATUS_META, statusColor, type TrackEntry } from '../features/tracking/types';
-import { useTrackingStore } from '../features/tracking/store';
-import { premiereLabel } from '../lib/format';
+import { behindCount, useTrackingStore } from '../features/tracking/store';
+import { premiereLabel, premiereSeasonLabel } from '../lib/format';
 
 /** A row in the Library: cover, title, status, progress bar + quick +1 control. */
 export function LibraryRow({ entry }: { entry: TrackEntry }) {
@@ -18,14 +18,22 @@ export function LibraryRow({ entry }: { entry: TrackEntry }) {
   const increment = useTrackingStore((s) => s.incrementProgress);
   const meta = STATUS_META[entry.status];
   const color = statusColor(colors, entry.status);
-  // Not-yet-released titles carry a self-clearing premiere countdown badge.
-  const premiere = entry.premiereAt != null ? premiereLabel(entry.premiereAt) : null;
   // Airing-state badges from the refreshed AniList snapshot (airingRefresh.ts).
   const notYetAired = entry.airingStatus === 'NOT_YET_RELEASED';
   const airing = entry.airingStatus === 'RELEASING';
+  // Not-yet-aired rows swap the (meaningless) progress bar for a premiere line:
+  // exact countdown when known, season/year otherwise, TBA as a last resort.
+  const premiere =
+    (entry.premiereAt != null ? premiereLabel(entry.premiereAt) : null) ??
+    premiereSeasonLabel(entry.season, entry.seasonYear);
+  const behind = behindCount(entry);
 
   const total = entry.totalEpisodes;
-  const pct = total ? Math.min(1, entry.progress / total) : entry.progress > 0 ? 0.05 : 0;
+  const aired = airing ? entry.airedEpisodes : null;
+  // While airing, progress reads against what has actually aired — "3 of 15
+  // aired" is actionable where "3 of 24" just looks abandoned.
+  const denom = aired ?? total;
+  const pct = denom ? Math.min(1, entry.progress / denom) : entry.progress > 0 ? 0.05 : 0;
   const atMax = total != null && entry.progress >= total;
 
   return (
@@ -52,12 +60,12 @@ export function LibraryRow({ entry }: { entry: TrackEntry }) {
           <Badge label={meta.short} color={color} />
           {notYetAired && <Badge label="Not yet aired" color={colors.info} variant="outline" />}
           {airing && <Badge label="Airing" color={colors.positive} />}
-          {airing && entry.airedEpisodes != null && entry.airedEpisodes > 0 && (
+          {behind > 0 && <Badge label={`${behind} behind`} color={colors.warning} />}
+          {airing && behind === 0 && entry.airedEpisodes != null && entry.airedEpisodes > 0 && (
             <Text variant="caption" color="textMuted">
               Ep {entry.airedEpisodes}
             </Text>
           )}
-          {premiere && <Badge label={premiere} color={colors.info} />}
           {entry.score > 0 && (
             <Text variant="caption" color={colors.warning}>
               ★ {entry.score}
@@ -65,33 +73,41 @@ export function LibraryRow({ entry }: { entry: TrackEntry }) {
           )}
         </View>
 
-        <View style={styles.progressRow}>
-          <View style={[styles.track, { backgroundColor: colors.surfaceHigh }]}>
-            <View style={[styles.fill, { width: `${pct * 100}%`, backgroundColor: color }]} />
-          </View>
-          <Text variant="caption" color="textMuted">
-            {entry.progress}
-            {total ? ` / ${total}` : ''}
+        {notYetAired ? (
+          <Text variant="caption" color="textMuted" style={styles.premiereLine}>
+            {premiere ?? 'Release date TBA'}
           </Text>
-        </View>
+        ) : (
+          <View style={styles.progressRow}>
+            <View style={[styles.track, { backgroundColor: colors.surfaceHigh }]}>
+              <View style={[styles.fill, { width: `${pct * 100}%`, backgroundColor: color }]} />
+            </View>
+            <Text variant="caption" color="textMuted">
+              {entry.progress}
+              {aired ? ` / ${aired} aired` : total ? ` / ${total}` : ''}
+            </Text>
+          </View>
+        )}
       </View>
 
-      <Pressable
-        onPress={() => increment(entry.mediaId)}
-        disabled={atMax}
-        hitSlop={8}
-        style={[
-          styles.plus,
-          { backgroundColor: withAlpha(color, atMax ? 0.06 : 0.18) },
-        ]}
-        accessibilityLabel="Increment episode progress"
-      >
-        <Ionicons
-          name={atMax ? 'checkmark' : 'add'}
-          size={20}
-          color={atMax ? colors.textFaint : color}
-        />
-      </Pressable>
+      {!notYetAired && (
+        <Pressable
+          onPress={() => increment(entry.mediaId)}
+          disabled={atMax}
+          hitSlop={8}
+          style={[
+            styles.plus,
+            { backgroundColor: withAlpha(color, atMax ? 0.06 : 0.18) },
+          ]}
+          accessibilityLabel="Increment episode progress"
+        >
+          <Ionicons
+            name={atMax ? 'checkmark' : 'add'}
+            size={20}
+            color={atMax ? colors.textFaint : color}
+          />
+        </Pressable>
+      )}
     </PressableScale>
   );
 }
@@ -136,6 +152,7 @@ const useStyles = makeStyles(({ radii }) => ({
     gap: spacing.sm,
     marginTop: 2,
   },
+  premiereLine: { marginTop: 2 },
   track: {
     flex: 1,
     height: 5,

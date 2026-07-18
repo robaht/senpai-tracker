@@ -10,7 +10,8 @@ import {
 } from 'react-native';
 import { useGoBack } from '../src/lib/useGoBack';
 import { Ionicons } from '@expo/vector-icons';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import Animated from 'react-native-reanimated';
+import { cardEntering } from '../src/lib/motion';
 import { Screen } from '../src/components/ui/Screen';
 import { Text } from '../src/components/ui/Text';
 import { Skeleton } from '../src/components/ui/Skeleton';
@@ -162,7 +163,7 @@ export default function BrowseScreen() {
           ) : null
         }
         renderItem={({ item }: { item: Media }) => (
-          <Animated.View entering={FadeIn.duration(250)} style={{ width: posterWidth }}>
+          <Animated.View entering={cardEntering} style={{ width: posterWidth }}>
             <PosterCard media={item} width={posterWidth} />
           </Animated.View>
         )}

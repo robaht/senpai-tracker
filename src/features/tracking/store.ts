@@ -111,6 +111,8 @@ export function snapshotFromMedia(media: Media): Pick<
   | 'premiereAt'
   | 'airingStatus'
   | 'airedEpisodes'
+  | 'season'
+  | 'seasonYear'
 > {
   return {
     title: displayTitle(media.title),
@@ -123,7 +125,18 @@ export function snapshotFromMedia(media: Media): Pick<
     premiereAt: premiereFromMedia(media),
     airingStatus: media.status ?? null,
     airedEpisodes: airedEpisodesFromMedia(media),
+    season: media.season ?? null,
+    seasonYear: media.seasonYear ?? null,
   };
+}
+
+/**
+ * Aired-but-unwatched episode count for an entry — the "N behind" catch-up
+ * signal. 0 when up to date, not airing, or the aired count is unknown.
+ */
+export function behindCount(entry: TrackEntry): number {
+  if (entry.airingStatus !== 'RELEASING' || entry.airedEpisodes == null) return 0;
+  return Math.max(0, entry.airedEpisodes - entry.progress);
 }
 
 /** Every mutation persists through the repository, then reflects in memory. */
@@ -290,12 +303,16 @@ export const useTrackingStore = create<TrackingState>((set, get) => {
           airedEpisodes: airedEpisodesFromMedia(media),
           totalEpisodes: media.episodes ?? existing.totalEpisodes,
           premiereAt: premiereFromMedia(media),
+          season: media.season ?? existing.season ?? null,
+          seasonYear: media.seasonYear ?? existing.seasonYear ?? null,
         };
         if (
           existing.airingStatus === patch.airingStatus &&
           existing.airedEpisodes === patch.airedEpisodes &&
           existing.totalEpisodes === patch.totalEpisodes &&
-          existing.premiereAt === patch.premiereAt
+          existing.premiereAt === patch.premiereAt &&
+          existing.season === patch.season &&
+          existing.seasonYear === patch.seasonYear
         ) {
           continue;
         }

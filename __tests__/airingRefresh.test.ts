@@ -1,5 +1,5 @@
 import { isAiringRefreshCandidate, runAiringRefresh } from '../src/features/tracking/airingRefresh';
-import { airedEpisodesFromMedia, useTrackingStore } from '../src/features/tracking/store';
+import { airedEpisodesFromMedia, behindCount, useTrackingStore } from '../src/features/tracking/store';
 import { getMediaForDetection } from '../src/api/anilist';
 import { media, trackEntry } from './_fixtures';
 
@@ -35,6 +35,19 @@ describe('isAiringRefreshCandidate', () => {
   it('excludes terminal statuses', () => {
     expect(isAiringRefreshCandidate(trackEntry(1, { airingStatus: 'FINISHED' }))).toBe(false);
     expect(isAiringRefreshCandidate(trackEntry(1, { airingStatus: 'CANCELLED' }))).toBe(false);
+  });
+});
+
+describe('behindCount', () => {
+  it('counts aired-but-unwatched episodes while airing', () => {
+    expect(behindCount(trackEntry(1, { airingStatus: 'RELEASING', airedEpisodes: 15, progress: 3 }))).toBe(12);
+    expect(behindCount(trackEntry(1, { airingStatus: 'RELEASING', airedEpisodes: 15, progress: 15 }))).toBe(0);
+  });
+
+  it('is 0 when not airing, aired count unknown, or progress ahead of schedule', () => {
+    expect(behindCount(trackEntry(1, { airingStatus: 'FINISHED', progress: 0, totalEpisodes: 12 }))).toBe(0);
+    expect(behindCount(trackEntry(1, { airingStatus: 'RELEASING', airedEpisodes: null, progress: 0 }))).toBe(0);
+    expect(behindCount(trackEntry(1, { airingStatus: 'RELEASING', airedEpisodes: 5, progress: 7 }))).toBe(0);
   });
 });
 

@@ -1,4 +1,4 @@
-import type { MediaStatus } from '../../api/anilist/types';
+import type { MediaSeason, MediaStatus } from '../../api/anilist/types';
 import type { ColorToken, ThemeColors } from '../../theme/tokens';
 
 /**
@@ -57,6 +57,12 @@ export interface TrackEntry {
    * `nextAiringEpisode.episode - 1`). Null when unknown or not airing.
    */
   airedEpisodes?: number | null;
+  /**
+   * AniList premiere season/year — the "Premieres Fall 2026" fallback for
+   * not-yet-aired titles that have no exact `premiereAt` timestamp yet.
+   */
+  season?: MediaSeason | null;
+  seasonYear?: number | null;
   // --- bookkeeping ---
   /** epoch ms — used for "recently updated" sorting and future sync conflict resolution. */
   updatedAt: number;

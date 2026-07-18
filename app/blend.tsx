@@ -10,7 +10,8 @@ import {
 import { useGoBack } from '../src/lib/useGoBack';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import Animated from 'react-native-reanimated';
+import { cardEntering } from '../src/lib/motion';
 import { Screen } from '../src/components/ui/Screen';
 import { Text } from '../src/components/ui/Text';
 import { PosterCard } from '../src/components/PosterCard';
@@ -132,7 +133,7 @@ export default function BlendScreen() {
           contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}
           renderItem={({ item }) => (
-            <Animated.View entering={FadeIn.duration(250)} style={{ width: posterWidth }}>
+            <Animated.View entering={cardEntering} style={{ width: posterWidth }}>
               <PosterCard media={item.media} width={posterWidth} />
             </Animated.View>
           )}

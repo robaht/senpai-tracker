@@ -3,6 +3,7 @@ import {
   formatScore,
   stripHtml,
   humanizeEnum,
+  premiereSeasonLabel,
   premiereLabel,
 } from '../src/lib/format';
 
@@ -51,5 +52,13 @@ describe('humanizeEnum', () => {
   it('title-cases snake enums but keeps short tokens upper', () => {
     expect(humanizeEnum('TV_SHORT')).toBe('TV Short');
     expect(humanizeEnum(null)).toBe('');
+  });
+});
+
+describe('premiereSeasonLabel', () => {
+  it('formats season + year, null when either is missing', () => {
+    expect(premiereSeasonLabel('FALL', 2026)).toBe('Premieres Fall 2026');
+    expect(premiereSeasonLabel(null, 2026)).toBeNull();
+    expect(premiereSeasonLabel('FALL', null)).toBeNull();
   });
 });

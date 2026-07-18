@@ -8,7 +8,7 @@ import { Text } from './ui/Text';
 import { withAlpha } from './ui/Badge';
 import { PressableScale } from './ui/PressableScale';
 import { SectionHeader } from './SectionHeader';
-import { useTrackingStore } from '../features/tracking/store';
+import { behindCount, useTrackingStore } from '../features/tracking/store';
 import { statusColor, type TrackEntry, type WatchStatus } from '../features/tracking/types';
 
 const CARD_WIDTH = 132;
@@ -58,7 +58,11 @@ function ContinueCard({ entry }: { entry: TrackEntry }) {
   const color = statusColor(colors, entry.status);
 
   const total = entry.totalEpisodes;
-  const pct = total ? Math.min(1, entry.progress / total) : entry.progress > 0 ? 0.05 : 0;
+  // While airing, the bar fills against episodes actually out — reaching the
+  // latest aired episode reads as "caught up", not one-eighth of a season.
+  const behind = behindCount(entry);
+  const denom = (entry.airingStatus === 'RELEASING' ? entry.airedEpisodes : null) ?? total;
+  const pct = denom ? Math.min(1, entry.progress / denom) : entry.progress > 0 ? 0.05 : 0;
   // When the last episode is reached, the +1 turns into a "finish" affordance
   // that marks the title Completed — which drops it from this rail.
   const atMax = total != null && entry.progress >= total;
@@ -79,6 +83,14 @@ function ContinueCard({ entry }: { entry: TrackEntry }) {
           transition={220}
           recyclingKey={String(entry.mediaId)}
         />
+
+        {behind > 0 && (
+          <View style={[styles.newPill, { backgroundColor: colors.mediaScrim }]}>
+            <Text variant="overline" color={colors.onMedia}>
+              {behind} new
+            </Text>
+          </View>
+        )}
 
         <Pressable
           onPress={() => (atMax ? setStatus(entry.mediaId, 'COMPLETED') : increment(entry.mediaId))}
@@ -117,6 +129,14 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
   },
   cover: { width: '100%', height: '100%' },
+  newPill: {
+    position: 'absolute',
+    top: spacing.xs + 2,
+    left: spacing.xs + 2,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    borderRadius: radii.pill,
+  },
   fab: {
     position: 'absolute',
     right: spacing.xs + 2,

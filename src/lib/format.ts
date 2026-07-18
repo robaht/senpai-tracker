@@ -52,6 +52,12 @@ export function premiereLabel(premiereAtSeconds: number): string | null {
   return `Premieres ${airingDateLabel(premiereAtSeconds)}`;
 }
 
+/** "Premieres Fall 2026" from AniList season parts; null when either is unknown. */
+export function premiereSeasonLabel(season: string | null | undefined, year: number | null | undefined): string | null {
+  if (!season || !year) return null;
+  return `Premieres ${humanizeEnum(season)} ${year}`;
+}
+
 /** "8:30 PM" local time for a unix-seconds timestamp. */
 export function airingTimeLabel(airingAtSeconds: number): string {
   return new Date(airingAtSeconds * 1000).toLocaleTimeString([], {

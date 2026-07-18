@@ -2,6 +2,8 @@ import { Fragment, useState } from 'react';
 import {
   View,
   StyleSheet,
+  Pressable,
+  TextInput,
   useWindowDimensions,
 } from 'react-native';
 import { useLocalSearchParams, useNavigation } from 'expo-router';
@@ -34,11 +36,16 @@ import { TrailerCard } from '../../src/components/TrailerCard';
 import { StreamingLinks } from '../../src/components/StreamingLinks';
 import { RatingStars } from '../../src/components/RatingStars';
 import { useAnime } from '../../src/api/anilist/hooks';
-import { displayTitle } from '../../src/api/anilist';
-import { useTrackEntry, useTrackingStore } from '../../src/features/tracking/store';
+import { displayTitle, type Media } from '../../src/api/anilist';
+import {
+  airedEpisodesFromMedia,
+  premiereFromMedia,
+  useTrackEntry,
+  useTrackingStore,
+} from '../../src/features/tracking/store';
 import { useComfortStore, useIsComfort } from '../../src/features/comfort/store';
 import { STATUS_META, statusColor } from '../../src/features/tracking/types';
-import { formatScore, humanizeEnum, stripHtml } from '../../src/lib/format';
+import { formatScore, humanizeEnum, premiereLabel, premiereSeasonLabel, stripHtml } from '../../src/lib/format';
 import { radii, spacing, motion, makeStyles, useTheme } from '../../src/theme';
 
 export default function AnimeDetailScreen() {
@@ -189,7 +196,7 @@ export default function AnimeDetailScreen() {
 
             {/* Primary action / tracking state */}
             {entry ? (
-              <TrackingPanel mediaId={mediaId} onChangeStatus={() => setSheetOpen(true)} />
+              <TrackingPanel mediaId={mediaId} media={media} onChangeStatus={() => setSheetOpen(true)} />
             ) : (
               <Button
                 label="Add to list"
@@ -455,20 +462,38 @@ function StatStrip({
 /** Inline tracking controls shown when an anime is already on the list. */
 function TrackingPanel({
   mediaId,
+  media,
   onChangeStatus,
 }: {
   mediaId: number;
+  media: Media;
   onChangeStatus: () => void;
 }) {
-  const { colors } = useTheme();
+  const { colors, typography } = useTheme();
   const styles = useStyles();
   const entry = useTrackEntry(mediaId);
   const increment = useTrackingStore((s) => s.incrementProgress);
   const setProgress = useTrackingStore((s) => s.setProgress);
   const setScore = useTrackingStore((s) => s.setScore);
+  // Tap-to-type episode entry — a stepper is fine for +1, hopeless for "set to 37".
+  const [draft, setDraft] = useState<string | null>(null);
   if (!entry) return null;
   const meta = STATUS_META[entry.status];
   const atMax = entry.totalEpisodes != null && entry.progress >= entry.totalEpisodes;
+
+  const notYetAired = media.status === 'NOT_YET_RELEASED';
+  const aired = airedEpisodesFromMedia(media);
+  const behind = aired != null ? Math.max(0, aired - entry.progress) : 0;
+  const premiere =
+    (premiereFromMedia(media) != null ? premiereLabel(premiereFromMedia(media)!) : null) ??
+    premiereSeasonLabel(media.season, media.seasonYear);
+
+  const commitDraft = () => {
+    if (draft == null) return;
+    const n = Number.parseInt(draft, 10);
+    setDraft(null);
+    if (Number.isFinite(n) && n !== entry.progress) setProgress(mediaId, n);
+  };
 
   return (
     <Card elevated style={styles.panel}>
@@ -478,30 +503,82 @@ function TrackingPanel({
         <Ionicons name="chevron-down" size={16} color={colors.textFaint} style={styles.panelChevron} />
       </PressableScale>
 
-      <View style={styles.stepper}>
-        <PressableScale
-          onPress={() => setProgress(mediaId, entry.progress - 1)}
-          disabled={entry.progress <= 0}
-          style={[styles.stepBtn, entry.progress <= 0 && styles.stepDisabled]}
-          hitSlop={6}
-        >
-          <Ionicons name="remove" size={20} color={colors.text} />
-        </PressableScale>
-        <View style={styles.stepCount}>
-          <Text variant="heading">{entry.progress}</Text>
-          <Text variant="caption" color="textFaint">
-            {entry.totalEpisodes ? `of ${entry.totalEpisodes}` : 'episodes'}
+      {notYetAired ? (
+        // No episodes exist yet — a stepper would just invite nonsense progress.
+        <View style={styles.preAir}>
+          <Ionicons name="hourglass-outline" size={16} color={colors.info} />
+          <Text variant="callout" color={colors.info}>
+            {premiere ?? 'Not yet aired — release date TBA'}
           </Text>
         </View>
-        <PressableScale
-          onPress={() => increment(mediaId)}
-          disabled={atMax}
-          style={[styles.stepBtn, styles.stepBtnPrimary, atMax && styles.stepDisabled]}
-          hitSlop={6}
-        >
-          <Ionicons name="add" size={20} color={colors.onAccent} />
-        </PressableScale>
-      </View>
+      ) : (
+        <>
+          <View style={styles.stepper}>
+            <PressableScale
+              onPress={() => setProgress(mediaId, entry.progress - 1)}
+              disabled={entry.progress <= 0}
+              style={[styles.stepBtn, entry.progress <= 0 && styles.stepDisabled]}
+              hitSlop={6}
+            >
+              <Ionicons name="remove" size={20} color={colors.text} />
+            </PressableScale>
+            {draft != null ? (
+              <View style={styles.stepCount}>
+                <TextInput
+                  value={draft}
+                  onChangeText={(t) => setDraft(t.replace(/[^0-9]/g, ''))}
+                  onBlur={commitDraft}
+                  onSubmitEditing={commitDraft}
+                  autoFocus
+                  selectTextOnFocus
+                  keyboardType="number-pad"
+                  maxLength={4}
+                  style={[
+                    styles.stepInput,
+                    { color: colors.text, fontFamily: typography.heading.fontFamily, borderColor: colors.borderStrong },
+                  ]}
+                  accessibilityLabel="Episode number"
+                />
+                <Text variant="caption" color="textFaint">
+                  {entry.totalEpisodes ? `of ${entry.totalEpisodes}` : 'episodes'}
+                </Text>
+              </View>
+            ) : (
+              <Pressable
+                onPress={() => setDraft(String(entry.progress))}
+                style={styles.stepCount}
+                accessibilityLabel="Edit episode number"
+              >
+                <Text variant="heading">{entry.progress}</Text>
+                <Text variant="caption" color="textFaint">
+                  {entry.totalEpisodes ? `of ${entry.totalEpisodes}` : 'episodes'}
+                </Text>
+              </Pressable>
+            )}
+            <PressableScale
+              onPress={() => increment(mediaId)}
+              disabled={atMax}
+              style={[styles.stepBtn, styles.stepBtnPrimary, atMax && styles.stepDisabled]}
+              hitSlop={6}
+            >
+              <Ionicons name="add" size={20} color={colors.onAccent} />
+            </PressableScale>
+          </View>
+
+          {behind > 0 && (
+            <PressableScale
+              onPress={() => setProgress(mediaId, aired!)}
+              style={[styles.catchUp, { backgroundColor: withAlpha(colors.warning, 0.12) }]}
+              accessibilityLabel={`Jump to episode ${aired}`}
+            >
+              <Ionicons name="play-forward" size={14} color={colors.warning} />
+              <Text variant="callout" color={colors.warning}>
+                {behind} behind · jump to Ep {aired}
+              </Text>
+            </PressableScale>
+          )}
+        </>
+      )}
 
       <View style={styles.panelDivider} />
       <RatingStars value={entry.score} onChange={(v) => setScore(mediaId, v)} />
@@ -598,6 +675,29 @@ const useStyles = makeStyles(({ colors, radii }) => ({
   stepBtnPrimary: { backgroundColor: colors.accent },
   stepDisabled: { opacity: 0.4 },
   stepCount: { alignItems: 'center', gap: 2 },
+  stepInput: {
+    fontSize: 19,
+    textAlign: 'center',
+    width: 96,
+    paddingVertical: 2,
+    paddingHorizontal: spacing.sm,
+    borderBottomWidth: 2,
+  },
+  preAir: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.md,
+  },
+  catchUp: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm + 2,
+    borderRadius: radii.md,
+  },
   statStrip: {
     flexDirection: 'row',
     marginTop: spacing.xl,
