@@ -1,3 +1,4 @@
+import type { MediaStatus } from '../../api/anilist/types';
 import type { ColorToken, ThemeColors } from '../../theme/tokens';
 
 /**
@@ -44,6 +45,18 @@ export interface TrackEntry {
    * no refetch. Optional/undefined for released titles and pre-existing entries.
    */
   premiereAt?: number | null;
+  /**
+   * AniList airing status (`RELEASING`, `NOT_YET_RELEASED`, …) as of the last
+   * snapshot/refresh. Powers the Library's "Not yet aired" / "Airing" badges.
+   * Kept fresh by the throttled batched refresh in `airingRefresh.ts`;
+   * undefined for pre-existing entries until their first refresh.
+   */
+  airingStatus?: MediaStatus | null;
+  /**
+   * Latest released episode number while the title is RELEASING (derived from
+   * `nextAiringEpisode.episode - 1`). Null when unknown or not airing.
+   */
+  airedEpisodes?: number | null;
   // --- bookkeeping ---
   /** epoch ms — used for "recently updated" sorting and future sync conflict resolution. */
   updatedAt: number;

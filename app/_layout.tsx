@@ -29,6 +29,7 @@ import { pullAndReconcile } from '../src/features/tracking/sync';
 import { useSyncStore } from '../src/features/tracking/syncStore';
 import { useNotificationStore } from '../src/features/notifications/store';
 import { runNotificationDetection } from '../src/features/notifications/detect';
+import { runAiringRefresh } from '../src/features/tracking/airingRefresh';
 import { ThemeProvider, useTheme } from '../src/theme';
 
 // Closes the OAuth popup and delivers the redirect result on web (F1).
@@ -82,6 +83,11 @@ export default function RootLayout() {
   useEffect(() => {
     if (trackingHydrated && notificationsHydrated) void runNotificationDetection();
   }, [trackingHydrated, notificationsHydrated]);
+
+  // Same pattern for the Library's airing-status badges (throttled, one request).
+  useEffect(() => {
+    if (trackingHydrated) void runAiringRefresh();
+  }, [trackingHydrated]);
 
   // Gate on prefs too, so a saved light theme doesn't flash the dark default.
   const ready = fontsLoaded && prefsHydrated;

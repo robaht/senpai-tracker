@@ -20,6 +20,9 @@ export function LibraryRow({ entry }: { entry: TrackEntry }) {
   const color = statusColor(colors, entry.status);
   // Not-yet-released titles carry a self-clearing premiere countdown badge.
   const premiere = entry.premiereAt != null ? premiereLabel(entry.premiereAt) : null;
+  // Airing-state badges from the refreshed AniList snapshot (airingRefresh.ts).
+  const notYetAired = entry.airingStatus === 'NOT_YET_RELEASED';
+  const airing = entry.airingStatus === 'RELEASING';
 
   const total = entry.totalEpisodes;
   const pct = total ? Math.min(1, entry.progress / total) : entry.progress > 0 ? 0.05 : 0;
@@ -47,6 +50,13 @@ export function LibraryRow({ entry }: { entry: TrackEntry }) {
         </Text>
         <View style={styles.metaLine}>
           <Badge label={meta.short} color={color} />
+          {notYetAired && <Badge label="Not yet aired" color={colors.info} variant="outline" />}
+          {airing && <Badge label="Airing" color={colors.positive} />}
+          {airing && entry.airedEpisodes != null && entry.airedEpisodes > 0 && (
+            <Text variant="caption" color="textMuted">
+              Ep {entry.airedEpisodes}
+            </Text>
+          )}
           {premiere && <Badge label={premiere} color={colors.info} />}
           {entry.score > 0 && (
             <Text variant="caption" color={colors.warning}>

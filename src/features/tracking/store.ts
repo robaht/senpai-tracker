@@ -48,6 +48,13 @@ interface TrackingState {
 
   /** Record an entry's AniList `remoteId` after a sync push (no timestamp bump). */
   setRemoteId: (mediaId: number, remoteId: number) => void;
+  /**
+   * Fold freshly-fetched airing state (status, aired episode count, total
+   * episodes, premiere) into matching entries. Background metadata only: no
+   * `updatedAt` bump (would pollute "recently updated" sorting and lose
+   * sync conflict resolution) and no sync push (nothing user-authored changed).
+   */
+  applyAiringRefresh: (medias: Media[]) => void;
   /** Drop the in-memory list (sign-out) WITHOUT clearing the persisted cache. */
   clearInMemory: () => void;
 }
@@ -81,9 +88,29 @@ export function premiereFromMedia(media: Media): number | null {
   return null;
 }
 
+/**
+ * Latest released episode number for an airing title — episodes strictly before
+ * the next-to-air one. Null when the title isn't RELEASING or AniList has no
+ * schedule for it (a count would be a guess).
+ */
+export function airedEpisodesFromMedia(media: Media): number | null {
+  if (media.status !== 'RELEASING') return null;
+  if (media.nextAiringEpisode) return Math.max(0, media.nextAiringEpisode.episode - 1);
+  return null;
+}
+
 export function snapshotFromMedia(media: Media): Pick<
   TrackEntry,
-  'title' | 'coverImage' | 'coverColor' | 'format' | 'totalEpisodes' | 'duration' | 'genres' | 'premiereAt'
+  | 'title'
+  | 'coverImage'
+  | 'coverColor'
+  | 'format'
+  | 'totalEpisodes'
+  | 'duration'
+  | 'genres'
+  | 'premiereAt'
+  | 'airingStatus'
+  | 'airedEpisodes'
 > {
   return {
     title: displayTitle(media.title),
@@ -94,6 +121,8 @@ export function snapshotFromMedia(media: Media): Pick<
     duration: media.duration ?? null,
     genres: media.genres ?? [],
     premiereAt: premiereFromMedia(media),
+    airingStatus: media.status ?? null,
+    airedEpisodes: airedEpisodesFromMedia(media),
   };
 }
 
@@ -248,6 +277,34 @@ export const useTrackingStore = create<TrackingState>((set, get) => {
       set({ entries: next });
       void trackingRepository.replaceAll(Object.values(next));
       return { added, updated, unchanged, total: entries.length };
+    },
+
+    applyAiringRefresh: (medias) => {
+      const entries = { ...get().entries };
+      let changed = false;
+      for (const media of medias) {
+        const existing = entries[media.id];
+        if (!existing) continue;
+        const patch = {
+          airingStatus: media.status ?? null,
+          airedEpisodes: airedEpisodesFromMedia(media),
+          totalEpisodes: media.episodes ?? existing.totalEpisodes,
+          premiereAt: premiereFromMedia(media),
+        };
+        if (
+          existing.airingStatus === patch.airingStatus &&
+          existing.airedEpisodes === patch.airedEpisodes &&
+          existing.totalEpisodes === patch.totalEpisodes &&
+          existing.premiereAt === patch.premiereAt
+        ) {
+          continue;
+        }
+        const next: TrackEntry = { ...existing, ...patch };
+        entries[media.id] = next;
+        changed = true;
+        void trackingRepository.upsert(next);
+      }
+      if (changed) set({ entries });
     },
 
     setRemoteId: (mediaId, remoteId) => {
