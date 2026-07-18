@@ -24,6 +24,9 @@ so any one can be picked up cold and started smoothly.
 | F28 | Notification center — new-episode/new-season alerts (in-app feed; local push is a native stretch) | P2 | M–L | Detection runs on app open; true push needs a server (same limitation as F3/F8) |
 | F29 | Notification delivery layer — per-category settings, native local push via `expo-notifications`, status-change events | P3 | M | Extends shipped F28 (in-app feed + detection loop) |
 | F30 | Filter Library by genre | P2 | S | — (extends shipped Library filters + genre browse) |
+| F31 | Schedule polish pack — dated headers, merged double-eps, smarter default filter, in-library markers | P2 | S–M | — (builds on shipped Schedule screen) |
+| F32 | Library quick actions — long-press sheet for status/score/remove | P2 | M | — (reuses shipped sheet + rating components) |
+| F33 | Accessibility label sweep — screen-reader labels/roles for all tappables | P3 | S–M | — (extends F27's sheet-a11y item) |
 
 **Suggested build order** (fast value first, heavy infra last):
 `F3 → F7 → F8 → F18`, with the review items (F26/F27/F28) as independent
@@ -519,5 +522,124 @@ alongside the existing status filter and search.
   abstraction — worth revisiting if a third screen needs the same pattern.
 - State: a local `genres: string[]` selection array, same shape as `browse.tsx`'s
   `toggleGenre` pattern (lines 51-52).
+
+---
+
+## F31 — Schedule polish pack
+
+**Goal:** Make the Schedule screen faster to read and act on: dated day headers,
+merged double-episode rows, a smarter default filter, and in-library markers with
+one-tap add.
+
+### The gaps (observed in a user-mode review, 2026-07-18)
+Day headers show only a weekday ("Fri") with no date; a double episode (e.g. MAO
+EP 15 + EP 16 at the same `airingAt`) renders as two visually identical rows;
+"All airing" is the default filter even when the user has a library (the "My
+list" view is the one they actually care about); and nothing on the All-airing
+view indicates which titles are already tracked.
+
+### Requirements / acceptance criteria
+- [ ] Day section headers show weekday + date ("Fri · Jul 24"; keep
+      "Today"/"Tomorrow" where they apply).
+- [ ] Consecutive episodes of the same title airing at the same time collapse
+      into one row labeled "EP 15–16" (notification detection & countdowns
+      unaffected).
+- [ ] When the library is non-empty, the screen defaults to the "My list"
+      filter (remember the user's last-chosen filter thereafter).
+- [ ] On "All airing"/"Upcoming", rows for titles already in the library show a
+      subtle in-library indicator; untracked rows get a quick-add affordance
+      that opens the add-to-list sheet without leaving the screen.
+- [ ] Filter chips and schedule rows carry proper accessibility labels (overlaps
+      F33; do these two rows here since the screen is being touched).
+
+### Technical approach
+- **Headers:** `airingDayLabel` / `airingDateLabel` in `src/lib/format.ts`
+  already produce "Today"/"Tomorrow"/"Sat 28 Jun" — switch the Schedule
+  section-header path in `app/(tabs)/schedule.tsx` from `airingDayLabel` to
+  `airingDateLabel` (or a compact variant of it).
+- **Double-ep merge:** in the grouping memo in `schedule.tsx`, coalesce adjacent
+  `AiringScheduleItem`s with the same `media.id` + `airingAt` into one row with
+  an episode range; render the range in `src/components/ScheduleRow.tsx`.
+- **Default filter:** read `useTrackingStore` — if entries exist, initialize the
+  filter state to `my-list`; persist last selection under a small AsyncStorage
+  key (`senpai:schedule-filter:v1`).
+- **In-library marker / quick add:** `useTrackingStore` lookup per row
+  (bookmark tick via `Ionicons`), plus reuse `AddToListSheet`
+  (`src/components/AddToListSheet.tsx`) driven from the row's media.
+
+---
+
+## F32 — Library quick actions (long-press sheet)
+
+**Goal:** Change status, set a score, or remove a title straight from the
+Library list — today every list-management action requires opening the detail
+screen (4 taps for what should be 2).
+
+### Requirements / acceptance criteria
+- [ ] Long-press (and/or an overflow affordance) on a `LibraryRow` opens a
+      bottom sheet for that title: status switcher, rating stars, remove.
+- [ ] Status changes and scores apply instantly (same store actions the detail
+      panel uses) and sync to AniList when signed in — no new mutation paths.
+- [ ] Remove asks for confirmation (destructive) and clears the row.
+- [ ] Works on web (long-press has a pointer equivalent — e.g. the overflow
+      button — since web long-press is unreliable).
+- [ ] Sheet is dismissible by backdrop/Escape and announces itself to screen
+      readers (ties into F27's sheet-a11y work).
+
+### Technical approach
+- Reuse the existing sheet component (`src/components/AddToListSheet.tsx` /
+  `src/components/ui/BottomSheet.tsx`) — extend or sibling it as
+  `LibraryActionsSheet` with the status list (`WATCH_STATUSES` + `STATUS_META`
+  from `src/features/tracking/types.ts`), `RatingStars`
+  (`src/components/RatingStars.tsx`), and a remove row calling
+  `useTrackingStore.untrack` (which already pushes the sync removal via
+  `syncHooks`).
+- Trigger: `onLongPress` on the `PressableScale` in
+  `src/components/LibraryRow.tsx`, plus an ellipsis `Pressable` (web fallback)
+  in the row's right cluster.
+- State lives in `app/(tabs)/library.tsx` (selected mediaId + sheet open flag),
+  mirroring how `app/anime/[id].tsx` drives `AddToListSheet`.
+
+---
+
+## F33 — Accessibility label sweep
+
+**Goal:** Every tappable in the app announces what it is to screen readers —
+today most poster cards, schedule rows, filter chips, and sheet options render
+as unlabeled `generic`/`button` nodes ("button, button, button" in VoiceOver).
+
+### The gap (observed via accessibility-tree inspection, 2026-07-18)
+`ContinueWatchingRail`'s card has `accessibilityRole`/`accessibilityLabel` and
+the Library +1 has a label — the pattern exists but isn't applied broadly.
+Schedule rows, Schedule/Library filter chips, `PosterCard`, `FeaturedCard`,
+`AddToListSheet` options, sort/backup sheets, and several icon-only buttons
+(bell, settings, stats, comfort) have no labels.
+
+### Requirements / acceptance criteria
+- [ ] All shared pressable components (`PosterCard`, `FeaturedCard`,
+      `ScheduleRow`, `LibraryRow`, `MatchCard`, sheet option rows, chip
+      components in `library.tsx`/`browse.tsx`/`schedule.tsx`) expose
+      `accessibilityRole="button"` and a meaningful `accessibilityLabel`
+      (title + key state, e.g. "That Time I Got Reincarnated as a Slime
+      Season 4, Watching, 3 episodes behind").
+- [ ] Icon-only header buttons (notifications bell, settings, stats, comfort,
+      back) all have labels (several already do — audit and fill gaps).
+- [ ] Filter chips announce selected state (`accessibilityState={{ selected }}`).
+- [ ] Spot-check with VoiceOver (iOS sim) and a web screen reader / the
+      browser accessibility tree: no unlabeled interactive nodes on the five
+      core screens (Discover, Schedule, Library, Detail, For You).
+
+### Technical approach
+- Centralize where possible: add optional `accessibilityLabel` props defaulting
+  to sensible strings inside the shared components
+  (`src/components/PosterCard.tsx`, `ScheduleRow.tsx`, `LibraryRow.tsx`,
+  `MatchCard.tsx`, `src/components/ui/PressableScale.tsx` passthrough), so
+  screens get labels for free.
+- Chips: the local `Chip` components in `app/(tabs)/library.tsx` and the inline
+  pills in `app/browse.tsx` / `schedule.tsx` gain `role`/`state` props.
+- Sheets: option rows in `AddToListSheet` (and F32's sheet if it lands first)
+  get labels; fold in F27's Escape/focus-restore item if it hasn't shipped yet.
+- Verification: browser-pane accessibility tree (`read_page`-style audit) on
+  web + VoiceOver spot-check on the iOS simulator (see `senpai-ios-dev` notes).
 
 ---
